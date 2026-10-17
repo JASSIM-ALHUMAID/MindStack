@@ -18,6 +18,7 @@ class ReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
+  // Temporary UI detail owned by this screen only, so plain setState is enough.
   bool _showAnswer = false;
 
   void _rate(Rating rating) {

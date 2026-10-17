@@ -17,11 +17,13 @@ class StatsScreen extends ConsumerStatefulWidget {
 }
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
+  // Planner inputs belong to this screen only, so plain setState is used.
   late DateTime _examDate = dateOnly(DateTime.now()).add(const Duration(days: 21));
   final TextEditingController _totalController = TextEditingController(text: '40');
   String? _planText;
   int? _planDays;
 
+  // Placeholder study history (days of the last 4 weeks with no session).
   static const Set<int> _missedDays = {3, 6, 11, 12, 15, 18};
 
   @override
