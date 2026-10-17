@@ -85,7 +85,7 @@ Figma: https://www.figma.com/design/KAn2gOCkXUHv5M9FcC4rlW/SWE463?node-id=0-1&p=
 
 ## AI use disclosure
 
-Claude (Anthropic) was the only AI tool used. It drafted the starter project, the styling that matches the app to the Figma design, the navigation diagram, the written technical plan and the layout of the Phase 2 document, working from the group's own Figma screens, Phase 1 proposal and the Phase 2 brief.
+Claude (Anthropic) was the only AI tool used. It helped draft parts of the technical plan, the navigation diagram and some of the starter Flutter code.
 
 ## Team
 
