@@ -1,0 +1,15 @@
+{
+  "deckTitle": "Navigation & routing",
+  "cards": [
+    {"question": "Navigator.push() does:", "answer": "Adds a route to the stack.", "source": "slide"},
+    {"question": "Navigator.pop() does:", "answer": "Removes the top route and returns to the previous one.", "source": "slide"},
+    {"question": "What is a named route?", "answer": "A route registered under a string path.", "source": "slide"},
+    {"question": "context.go vs context.push in go_router?", "answer": "go replaces the stack with the target; push adds on top of it.", "source": "pdf"},
+    {"question": "What is a path parameter?", "answer": "A variable segment of a route such as /deck/:deckId.", "source": "pdf"},
+    {"question": "What is ShellRoute for?", "answer": "Wraps child routes in a persistent shell, like a bottom navigation bar.", "source": "pdf"},
+    {"question": "What does PopScope control?", "answer": "Whether and how the system back gesture pops the current route.", "source": "photo"},
+    {"question": "What is a deep link?", "answer": "A URL that opens a specific screen inside the app.", "source": "photo"},
+    {"question": "What is a redirect in go_router?", "answer": "A function that sends the user to another location before the page builds.", "source": "slide"},
+    {"question": "What does Navigator.maybePop() do?", "answer": "Pops the route only if a route below it exists or the route allows it.", "source": "slide"}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "deckTitle": "Flutter Widgets",
+  "cards": [
+    {"question": "What is a Widget?", "answer": "The immutable building block of a Flutter UI.", "source": "slide"},
+    {"question": "Stateless vs Stateful?", "answer": "Stateless rebuilds from config; Stateful keeps a mutable State object.", "source": "slide"},
+    {"question": "What does setState() do?", "answer": "Marks the state dirty and schedules a rebuild.", "source": "pdf"},
+    {"question": "Define BuildContext.", "answer": "A handle to a widget's location in the element tree.", "source": "pdf"},
+    {"question": "What is hot reload?", "answer": "Injects changed source into the running Dart VM without losing app state.", "source": "photo"}
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "deckTitle": "One card only",
+  "cards": [
+    {"question": "What is go_router?", "answer": "A declarative routing package built on Navigator 2.", "source": "manual"}
+  ]
+}
