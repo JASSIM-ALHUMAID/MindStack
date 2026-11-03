@@ -35,6 +35,15 @@ State lives in Riverpod providers backed by in-memory sample data (`lib/data/sam
 - The Review queue is built when the app starts, so cards added during a session appear in Review after a restart.
 - Card editing, draft editing, import, sharing and read-aloud show a "arrives in Phase 3" message.
 
+## Phase 3 workflow
+
+The Phase 3 plan is in [docs/plan/phase3-plan.md](docs/plan/phase3-plan.md); each task is a GitHub issue in the `Phase 3` milestone.
+
+- One branch per task: `feat/<task>` (for example `feat/database`). Nobody pushes straight to `main`.
+- Commit messages: `feat(scope): short summary`, `fix(scope): ...`, `docs: ...`, `test: ...`.
+- Every change goes through a pull request that another member reviews. Mention the issue (`Closes #N`) in the PR.
+- Sample `.mindstack` files for parser tests and manual import testing: [test/fixtures/mindstack](test/fixtures/mindstack/README.md).
+
 ## Folder structure
 
 ```

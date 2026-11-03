@@ -1,0 +1,9 @@
+{
+  "deckTitle": "Riverpod state",
+  "cards": [
+    {"question": "What is a NotifierProvider?", "answer": "A provider that exposes state and the methods that change it.", "source": "slide"},
+    {"question": "ref.watch vs ref.read?", "answer": "watch rebuilds on change; read gets the value once, for callbacks.", "source": "slide"},
+    {"question": "What does ProviderScope do?", "answer": "Stores the state of all providers; placed at the root of the app.", "source": "pdf"},
+    {"question": "What is Provider.family?", "answer": "A provider that takes an argument, e.g. a deck id.", "source": "pdf"}
+  ]
+}
