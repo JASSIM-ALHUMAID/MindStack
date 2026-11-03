@@ -1,0 +1,8 @@
+{
+  "deckTitle": "مراجعة · Unicode & long text",
+  "cards": [
+    {"question": "ما هو الـ Widget في Flutter؟", "answer": "العنصر الأساسي لبناء واجهة المستخدم.", "source": "slide"},
+    {"question": "Edge case: a very long answer that should wrap and truncate cleanly in a draft card?", "answer": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.", "source": "pdf"},
+    {"question": "Symbols: what does \"quotes\", \\backslash and 'apostrophes' look like? 🙂", "answer": "Line one\nLine two\ttabbed", "source": "photo"}
+  ]
+}

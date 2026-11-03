@@ -1,0 +1,6 @@
+{
+  "deckTitle": "Card without answer",
+  "cards": [
+    {"question": "Has a question but no answer", "source": "manual"}
+  ]
+}

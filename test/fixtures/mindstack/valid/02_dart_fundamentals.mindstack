@@ -1,0 +1,11 @@
+{
+  "deckTitle": "Dart fundamentals",
+  "cards": [
+    {"question": "final vs const?", "answer": "final is set once at run time; const is a compile-time constant.", "source": "slide"},
+    {"question": "What is null safety?", "answer": "Types are non-nullable unless marked with ?, checked at compile time.", "source": "slide"},
+    {"question": "What does async/await do?", "answer": "Lets you write asynchronous code that reads like sequential code, returning a Future.", "source": "pdf"},
+    {"question": "What is a Stream?", "answer": "A sequence of asynchronous events delivered over time.", "source": "pdf"},
+    {"question": "What is a mixin?", "answer": "A way to reuse a class's code in several class hierarchies.", "source": "photo"},
+    {"question": "What is the late keyword for?", "answer": "Declares a non-nullable variable that is initialized after declaration.", "source": "slide"}
+  ]
+}
