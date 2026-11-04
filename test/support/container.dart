@@ -7,6 +7,7 @@ import 'package:mindstack/application/services.dart';
 import 'package:mindstack/core/clock.dart';
 import 'package:mindstack/core/ids.dart';
 import 'package:mindstack/data/database/app_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes.dart';
 import 'test_database.dart';
@@ -19,7 +20,9 @@ ProviderContainer makeContainer({
   Clock? clock,
   IdGenerator? ids,
   List<Override> overrides = const [],
+  Map<String, Object> initialPreferences = const {},
 }) {
+  SharedPreferences.setMockInitialValues(initialPreferences);
   final container = ProviderContainer(
     overrides: [
       databaseProvider.overrideWith((ref) {

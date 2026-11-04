@@ -63,7 +63,13 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
               : "TODAY'S QUEUE · $total DUE",
           title: 'Review',
           trailing: TextButton.icon(
-            onPressed: () => ref.read(settingsProvider.notifier).toggleTts(),
+            onPressed: () async {
+              await runSave(
+                context,
+                ref,
+                () => ref.read(settingsProvider.notifier).toggleTts(),
+              );
+            },
             icon: Icon(
               settings.ttsEnabled ? LucideIcons.volume2 : LucideIcons.volumeX,
               size: 18,
