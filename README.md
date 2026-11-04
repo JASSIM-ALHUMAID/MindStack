@@ -21,7 +21,7 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 
 - **Navigation:** bottom bar with Inbox, Library, Review, Quiz and Stats. The app opens on Library. Deck Editor is pushed with go_router (`/deck/:deckId`); Android back from another tab returns to Library.
 - **Library:** courses with days to exam, decks with card count and mastery. + Course opens the Create Course sheet (title and exam date, with validation). + Deck on a course opens the Create Deck sheet and then the new deck.
-- **Deck Editor:** card list, Add Card sheet with validation, delete a card, Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
+- **Deck Editor:** card list, Add Card sheet with validation, delete a card (Edit is a placeholder), Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
 - **Inbox:** draft cards with source pills and checkmarks, CLEAR, and Save selected → Choose deck sheet, which saves the ticked drafts as cards. Screenshots, PDF, Import a shared deck and EDIT are placeholders.
 - **Review:** flip card, four colored rating buttons that show each card's next interval, simplified SM-2 scheduling, session complete with the cards reviewed and the next due day.
 - **Quiz:** five sample questions, correct and wrong answer feedback with an explanation, results with accuracy and the questions missed, Review weak cards.
@@ -32,7 +32,8 @@ Courses, decks, cards and OCR drafts are stored in a local SQLite database (drif
 ### Known limitations (Phase 3 work)
 
 - Review logs, settings and quiz history are not wired to storage yet (later Phase 3 tasks). The quiz still asks sample questions and the Stats streak is placeholder history.
-- Draft editing, import, sharing and read-aloud show a "arrives in Phase 3" message.
+- Card editing, draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
+- The Review screen's read-aloud toggle (TTS ON/OFF) is saved for the session but does not speak yet; no text-to-speech package is added.
 
 ## Phase 3 workflow
 

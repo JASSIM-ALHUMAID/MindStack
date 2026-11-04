@@ -111,6 +111,7 @@ Task 0 owner also sets up the issue board: one GitHub issue per task, branch `fe
 ### Task 1: drift database, repositories, boot gate (F3, F4, F5 storage)
 
 **Files:**
+Files and steps below are the original plan; the Interfaces block describes what was built (see README for the layout).
 - Modify: `pubspec.yaml` (add `drift`, `drift_flutter`, `path_provider`, dev `drift_dev`, `build_runner`; use `flutter pub add`)
 - Create: `lib/data/app_database.dart`, `lib/data/seed.dart`, `lib/data/repositories/{library,card,draft,review_log}_repository.dart`, `lib/providers/boot_provider.dart`, `lib/widgets/app_gate.dart`
 - Modify: `lib/main.dart`, `lib/app.dart`, `lib/providers/library_provider.dart`, `lib/providers/inbox_provider.dart`
