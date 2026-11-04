@@ -44,6 +44,9 @@ abstract interface class CardRepository {
   /// Cards due at or before [now], optionally limited to [deckId].
   Future<List<Flashcard>> due({required DateTime now, String? deckId});
 
+  /// The card with [id]. Throws `NotFound` if it does not exist.
+  Future<Flashcard> byId(String id);
+
   /// Throws `Conflict` on a duplicate id.
   Future<void> insert(Flashcard card);
 

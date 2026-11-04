@@ -56,6 +56,16 @@ void main() {
     },
   );
 
+  test('byId returns the stored card', () async {
+    final card = _card('k1');
+    await repo.insert(card);
+    expect(await repo.byId('k1'), card);
+  });
+
+  test('byId unknown id throws NotFound', () async {
+    await expectLater(repo.byId('nope'), throwsA(isA<NotFound>()));
+  });
+
   test('insert duplicate id throws Conflict(duplicateId)', () async {
     await repo.insert(_card('k1'));
     await expectLater(

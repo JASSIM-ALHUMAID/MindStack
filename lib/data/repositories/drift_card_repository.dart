@@ -73,6 +73,15 @@ final class DriftCardRepository implements CardRepository {
       });
 
   @override
+  Future<Flashcard> byId(String id) => guard(() async {
+    final row = await (_db.select(
+      _db.flashcards,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (row == null) throw NotFound(entity: 'card', id: id);
+    return row.toModel();
+  });
+
+  @override
   Future<void> insert(Flashcard card) => guard(
     () => _db.into(_db.flashcards).insert(card.toCompanion()),
     onForeignKey: () => NotFound(entity: 'deck', id: card.deckId),
