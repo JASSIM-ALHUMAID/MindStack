@@ -66,8 +66,9 @@ lib/
     sample_data.dart             # seed input only
     (Task 7 adds repositories/mindstack_file.dart: encode/decode .mindstack JSON)
   application/
-    core_providers.dart          # clock, ids, logger, database, repositories, transactionRunner
-    startup.dart                 # appStartupProvider
+    services.dart                # clock, ids, logger (safe for presentation to import)
+    core_providers.dart          # database, seed data, repositories, transactionRunner (composition root)
+    startup.dart                 # appStartupProvider, startupRetryProvider
     library.dart cards.dart inbox.dart review.dart quiz.dart settings.dart tab.dart validation.dart
     (Task 6 adds stats.dart: streak, weakest, mastery by deck)
   presentation/
@@ -126,14 +127,15 @@ Files and steps below are the original plan; the Interfaces block describes what
 - Produces: `abstract interface class DraftRepository { Stream<List<DraftCard>> watchAll(); Future<List<DraftCard>> selected(); Future<void> insertAll(List<DraftCard> drafts); Future<void> toggleSelected(String id); Future<void> delete(Iterable<String> ids); Future<void> clear(); }`
 - Produces: `abstract interface class ReviewLogRepository { Stream<List<ReviewLog>> watchAll(); Future<void> insert(ReviewLog log); }`
 - No upserts: `insert*` fails with `Conflict` on a duplicate id; `update` and `delete` throw `NotFound` for a missing row. Repositories throw only `AppFailure` (`lib/domain/failures.dart`): sealed `NotFound(entity, id)`, `Conflict(ConflictKind.duplicateId | duplicateTitle)`, `InvalidInput(field, reason)`, `StorageFailure(cause, stack)`, each with a plain-language `userMessage`.
-- Produces (`application/core_providers.dart`): `clockProvider`, `idGeneratorProvider`, `loggerProvider`, `databaseProvider`, `seedDataProvider`, `sampleQuizProvider`, `libraryRepositoryProvider`, `cardRepositoryProvider`, `draftRepositoryProvider`, `reviewLogRepositoryProvider`, `transactionRunnerProvider` (all overridable in tests).
+- Produces (`application/services.dart`): `clockProvider`, `idGeneratorProvider`, `loggerProvider`. Presentation imports these from `services.dart` and never imports `core_providers.dart`.
+- Produces (`application/core_providers.dart`): `databaseProvider`, `seedDataProvider`, `sampleQuizProvider`, `libraryRepositoryProvider`, `cardRepositoryProvider`, `draftRepositoryProvider`, `reviewLogRepositoryProvider`, `transactionRunnerProvider` (all overridable in tests).
 - Produces (read side): `coursesProvider` (`StreamProvider<List<Course>>`), `decksProvider` (`StreamProvider<List<Deck>>`), `deckProvider(id)` (`AsyncValue<Deck?>`, null data when missing), `allCardsProvider` (`StreamProvider<List<Flashcard>>`), `deckCardsProvider(deckId)`, `deckStatsProvider` (`StreamProvider<Map<String, DeckStats>>`), `draftsProvider` (`StreamProvider<List<DraftCard>>`), `ocrProgressProvider` (`StateProvider<double?>`).
 - Produces (write side, validated; throw `InvalidInput`, `NotFound`, `Conflict` or `StorageFailure` as documented on each method):
   - `libraryCommandsProvider` -> `LibraryCommands { Future<String> createCourse({required String title, required DateTime examDate}); Future<String> createDeck({required String courseId, required String title}); Future<void> deleteDeck(String id); Future<int> mergeDecks({required String fromId, required String toId}); }` (`mergeDecks` runs in one transaction).
   - `cardCommandsProvider` -> `CardCommands { Future<String> addCard({required String deckId, required String question, required String answer, CardSource source = CardSource.manual, String? sourceRef}); Future<void> deleteCard(String id); Future<Flashcard> rateCard(String id, Rating rating); }` (`rateCard` reads, applies `Sm2Scheduler`, and writes in one transaction). There is no card-edit command yet: Task 3 adds `updateCard` here, built on `CardRepository.byId` and `update`.
   - `inboxCommandsProvider` -> `InboxCommands { Future<void> toggle(String id); Future<void> clear(); Future<int> saveSelectedTo(String deckId); }` (`saveSelectedTo` inserts cards and deletes the drafts in one transaction).
 - Produces: `reviewProvider` (`AsyncNotifierProvider<ReviewNotifier, ReviewState>`): `build()` snapshots the due card ids; `Future<void> rate(Rating rating)` (rethrows `AppFailure`, releases the saving flag), `void restart()`, `Future<void> startDeck(String deckId)`, `Future<void> startWeak({int count = 3})`, `void skip()`. `currentReviewCardProvider` reads the current card live. `ReviewNotifier` does not write review logs yet: Task 4 adds that (`ReviewLogRepository.insert`).
-- Produces: `appStartupProvider` (`FutureProvider<void>`: opens the database, seeds once, fails only with `AppFailure`) and the `AppGate` widget (`presentation/widgets/app_gate.dart`): spinner while startup runs, then an error card with **Retry** (`ref.invalidate(databaseProvider)`, which closes and reopens the database and restarts startup), then the router child.
+- Produces: `appStartupProvider` (`FutureProvider<void>`: opens the database, seeds once, fails only with `AppFailure`) and the `AppGate` widget (`presentation/widgets/app_gate.dart`): spinner while startup runs, then an error card with **Retry** (calls `startupRetryProvider`, which invalidates `databaseProvider`: the failed database is closed, a fresh one is opened and startup runs again), then the router child.
 
 - [ ] **Step 1: Write failing tests** with an in-memory `AppDatabase(NativeDatabase.memory())`: `test('card round-trips every Flashcard field')`, `test('seed runs once: second call leaves 2 courses, 4 decks, 9 cards')`, `test('moveDeck moves all cards of from-deck')`, `test('deleteDeck leaves other decks untouched')`.
 - [ ] **Step 2:** Run `flutter test test/data` → FAIL (types missing).
