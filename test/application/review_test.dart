@@ -61,8 +61,8 @@ final class _GatedRunner implements TransactionRunner {
   }
 }
 
-/// A [CardRepository] whose `watchByDeck` stream waits for [gate] before it
-/// emits; everything else is delegated.
+/// A [CardRepository] whose deck reads wait for [gate] before returning;
+/// everything else is delegated.
 final class _GatedDeckCards implements CardRepository {
   _GatedDeckCards(this._inner, this.gate);
 
@@ -82,8 +82,10 @@ final class _GatedDeckCards implements CardRepository {
   Stream<Map<String, DeckStats>> watchDeckStats() => _inner.watchDeckStats();
 
   @override
-  Future<List<Flashcard>> due({required DateTime now, String? deckId}) =>
-      _inner.due(now: now, deckId: deckId);
+  Future<List<Flashcard>> due({required DateTime now, String? deckId}) async {
+    if (deckId != null) await gate;
+    return _inner.due(now: now, deckId: deckId);
+  }
 
   @override
   Future<Flashcard> byId(String id) => _inner.byId(id);
@@ -219,14 +221,15 @@ void main() {
     expect(c.read(reviewProvider).requireValue.index, 0);
   });
 
-  test('startDeck queues only that deck', () async {
+  test('startDeck queues only due cards in that deck', () async {
     final c = makeContainer(clock: FixedClock(_now));
     final a = await _deck(c, 'A');
     final b = await _deck(c, 'B');
-    final inA = await _card(
+    final inA = await _card(c, a, question: 'a');
+    await _card(
       c,
       a,
-      question: 'a',
+      question: 'not due yet',
       dueAt: _now.add(const Duration(days: 9)),
     );
     await _card(c, b, question: 'b');

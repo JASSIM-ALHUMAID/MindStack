@@ -61,13 +61,22 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   /// [rate] can tell its session is gone.
   int _session = 0;
 
+  DateTime? _cardStartedAt;
+  bool _building = false;
+
   @override
   Future<ReviewState> build() async {
+    _building = true;
     _session++;
-    final due = await ref
-        .read(cardRepositoryProvider)
-        .due(now: ref.read(clockProvider).now());
-    return ReviewState(cardIds: [for (final c in due) c.id]);
+    try {
+      final due = await ref
+          .read(cardRepositoryProvider)
+          .due(now: ref.read(clockProvider).now());
+      _cardStartedAt = ref.read(clockProvider).now();
+      return ReviewState(cardIds: [for (final c in due) c.id]);
+    } finally {
+      _building = false;
+    }
   }
 
   /// Rates the current card and moves to the next one.
@@ -83,9 +92,17 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     if (state.isLoading || current == null || current.saving) return;
     if (current.finished) return;
     final session = _session;
+    final now = ref.read(clockProvider).now();
+    final elapsedMs = now.difference(_cardStartedAt ?? now).inMilliseconds;
     state = AsyncData(current.copyWith(saving: true));
     try {
-      await ref.read(cardCommandsProvider).rateCard(current.currentId!, rating);
+      await ref
+          .read(cardCommandsProvider)
+          .rateCard(
+            current.currentId!,
+            rating,
+            elapsedMs: elapsedMs < 0 ? 0 : elapsedMs,
+          );
     } catch (_) {
       // Any failure, not only AppFailure, must release the saving flag.
       if (session == _session) {
@@ -96,6 +113,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     // A restart or a new queue replaced this session while the write ran;
     // the rating is stored but must not touch the new queue.
     if (session != _session) return;
+    _cardStartedAt = ref.read(clockProvider).now();
     state = AsyncData(current.copyWith(index: current.index + 1));
   }
 
@@ -106,6 +124,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     final current = state.valueOrNull;
     if (state.isLoading || current == null || current.saving) return;
     if (current.finished) return;
+    _cardStartedAt = ref.read(clockProvider).now();
     state = AsyncData(current.copyWith(index: current.index + 1));
   }
 
@@ -114,16 +133,36 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     final current = state.valueOrNull;
     if (current == null) return;
     _session++;
+    _cardStartedAt = ref.read(clockProvider).now();
     state = AsyncData(current.copyWith(index: 0, saving: false));
   }
 
-  /// Studies every card of [deckId] (from the Deck Editor).
-  Future<void> startDeck(String deckId) async {
-    await _start(
-      () => ref.read(cardRepositoryProvider).watchByDeck(deckId).first,
-      (cards) => cards,
-    );
+  /// Loads a fresh session. By default only cards due now are included,
+  /// optionally limited to [deckId]. Explicit [cardIds] select practice cards
+  /// regardless of due date, preserving order and removing duplicates.
+  /// Missing ids are skipped; an explicit empty list creates an empty session.
+  Future<void> start({String? deckId, List<String>? cardIds}) async {
+    // Copy the caller's list before the asynchronous load begins.
+    final selectedIds = cardIds == null ? null : [...cardIds];
+    await _start(() async {
+      final repository = ref.read(cardRepositoryProvider);
+      if (selectedIds == null) {
+        return repository.due(
+          now: ref.read(clockProvider).now(),
+          deckId: deckId,
+        );
+      }
+      final cards = await repository.watchAll().first;
+      final byId = {
+        for (final card in cards)
+          if (deckId == null || card.deckId == deckId) card.id: card,
+      };
+      return [for (final id in selectedIds.toSet()) ?byId[id]];
+    }, (cards) => cards);
   }
+
+  /// Studies cards currently due in [deckId] (from the Deck Editor).
+  Future<void> startDeck(String deckId) => start(deckId: deckId);
 
   /// Drills the [count] cards with the lowest mastery (from Stats or Quiz
   /// results).
@@ -140,6 +179,15 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     Future<List<Flashcard>> Function() load,
     List<Flashcard> Function(List<Flashcard>) select,
   ) async {
+    // The initial AsyncNotifier build owns its result. Let it finish before
+    // replacing the queue, otherwise it could overwrite a targeted session.
+    if (_building) {
+      try {
+        await future;
+      } catch (_) {
+        // A fresh start is also allowed to retry a failed initial load.
+      }
+    }
     final session = ++_session;
     state = const AsyncLoading<ReviewState>().copyWithPrevious(state);
     final result = await AsyncValue.guard(() async {
@@ -149,6 +197,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     // A newer start, restart or rebuild replaced this one while it loaded;
     // its queue (or failure) must not overwrite the newer session.
     if (session != _session) return;
+    if (result.hasValue) _cardStartedAt = ref.read(clockProvider).now();
     state = result;
   }
 }

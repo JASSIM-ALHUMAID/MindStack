@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../application/review.dart';
 import '../../application/tab.dart';
 import 'inbox_screen.dart';
 import 'library_screen.dart';
@@ -36,8 +39,15 @@ class AppShell extends ConsumerWidget {
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
-          onDestinationSelected: (i) =>
-              ref.read(tabIndexProvider.notifier).set(i),
+          onDestinationSelected: (i) {
+            // Only a manual entry into Review starts the general due queue.
+            // Study/Drill start their own session before switching tabs, so
+            // those programmatic switches must not replace their selection.
+            if (i == 2 && index != 2) {
+              unawaited(ref.read(reviewProvider.notifier).start());
+            }
+            ref.read(tabIndexProvider.notifier).set(i);
+          },
           destinations: const [
             NavigationDestination(
               icon: Icon(LucideIcons.inbox),
