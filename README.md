@@ -2,11 +2,11 @@
 
 Spaced-repetition study app. Students import lecture material (screenshots, camera photos, PDFs), turn it into flashcards on the device, and review them on a schedule that ends at their exam date. Everything stays on the phone: no account, no server.
 
-This repository is the Phase 2 starter project. It runs on Android (tested by the group), every main screen is reachable, and the core flows (courses, decks, cards, review, quiz, stats) work on local sample data. Import with on-device OCR, SQLite storage, read-aloud and study reminders are planned for Phase 3.
+This repository is the Phase 2 starter project. It runs on Android (tested by the group), every main screen is reachable, and the core flows (courses, decks, cards, review, quiz, stats) work on local sample data. Import with on-device OCR, read-aloud and study reminders are planned for Phase 3.
 
 ## Run it
 
-Requires Flutter 3.27.4 or newer.
+Requires Flutter 3.47 or newer (Dart 3.13).
 
 ```bash
 flutter pub get
@@ -21,19 +21,20 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 
 - **Navigation:** bottom bar with Inbox, Library, Review, Quiz and Stats. The app opens on Library. Deck Editor is pushed with go_router (`/deck/:deckId`); Android back from another tab returns to Library.
 - **Library:** courses with days to exam, decks with card count and mastery. + Course opens the Create Course sheet (title and exam date, with validation). + Deck on a course opens the Create Deck sheet and then the new deck.
-- **Deck Editor:** card list, Add Card sheet with validation, delete a card, Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
+- **Deck Editor:** card list, Add Card sheet with validation, delete a card (Edit is a placeholder), Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
 - **Inbox:** draft cards with source pills and checkmarks, CLEAR, and Save selected → Choose deck sheet, which saves the ticked drafts as cards. Screenshots, PDF, Import a shared deck and EDIT are placeholders.
 - **Review:** flip card, four colored rating buttons that show each card's next interval, simplified SM-2 scheduling, session complete with the cards reviewed and the next due day.
 - **Quiz:** five sample questions, correct and wrong answer feedback with an explanation, results with accuracy and the questions missed, Review weak cards.
 - **Stats:** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
 
-State lives in Riverpod providers backed by in-memory sample data (`lib/data/sample_data.dart`).
+Courses, decks, cards and OCR drafts are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. The Review queue is the exception (see below).
 
 ### Known limitations (Phase 3 work)
 
-- Nothing is saved between app restarts yet (drift/SQLite comes in Phase 3).
-- The Review queue is built when the app starts, so cards added during a session appear in Review after a restart.
-- Card editing, draft editing, import, sharing and read-aloud show a "arrives in Phase 3" message.
+- The Review queue is a snapshot taken when the Review tab is first built (app start), and "Review again" replays that snapshot. Newly added or saved cards reach Review only through Study or Drill, or after a restart (Task 4 makes the queue live).
+- Settings (read-aloud, reminder time) live only for the current session and are not persisted. Review logs and quiz history are not wired to storage yet (later Phase 3 tasks). The quiz still asks sample questions and the Stats streak is placeholder history.
+- Card editing, draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
+- The Review screen's read-aloud toggle (TTS ON/OFF) is saved for the session but does not speak yet; no text-to-speech package is added.
 
 ## Phase 3 workflow
 
@@ -46,22 +47,35 @@ The Phase 3 plan is in [docs/plan/phase3-plan.md](docs/plan/phase3-plan.md); eac
 
 ## Folder structure
 
+Layers import downwards only: `core` imports nothing app-level, `domain` imports `core`, `data` imports `domain` and `core`, `application` imports `data`, `domain` and `core`, `presentation` imports `application`, `domain` and `core`.
+
 ```
 lib/
-  main.dart                 ProviderScope + runApp
-  app.dart                  MaterialApp.router
-  router.dart               go_router routes
-  route_names.dart          route paths
-  theme/app_theme.dart      Material 3 theme, colors and fonts from Figma
-  models/                   Course, Deck, Flashcard, DraftCard, ReviewLog, QuizQuestion
-  data/sample_data.dart     local sample data
-  providers/                Riverpod providers (library, inbox, review, quiz, settings, tab)
-  screens/                  app_shell, library, deck_editor, inbox, review, quiz, stats
-  widgets/                  shared widgets, create_course_sheet, create_deck_sheet, add_card_sheet
-  utils/format.dart         date and interval formatting
-assets/fonts/               Newsreader, Inter, JetBrains Mono + licenses
-test/widget_test.dart
-android/ ios/ web/ ...      platform folders generated by flutter create
+  main.dart                    ProviderScope + runApp
+  app.dart                     MaterialApp.router
+  router.dart                  go_router routes
+  route_names.dart             route paths
+  theme/app_theme.dart         Material 3 theme, colors and fonts from Figma
+  core/                        clock, ids, logger, dates (no app imports)
+  domain/                      enums, failures, scheduler, repository interfaces
+    models/                    Course, Deck, DeckStats, Flashcard, DraftCard, ReviewLog, QuizQuestion
+  data/                        drift implementation of the domain interfaces
+    database/                  AppDatabase, tables, converters, generated app_database.g.dart
+    repositories/              drift library, card, draft and review log repositories
+    drift_transaction_runner.dart, failure_mapping.dart, mappers.dart
+    seed.dart, sample_data.dart
+  application/                 Riverpod providers, command classes, startup, review and quiz notifiers
+  presentation/                format.dart, save_feedback.dart
+    screens/                   app_shell, library, deck_editor, inbox, review, quiz, stats
+    widgets/                   app_gate, async_value_view, common, create_course_sheet, create_deck_sheet, add_card_sheet
+assets/fonts/                  Newsreader, Inter, JetBrains Mono + licenses
+test/
+  domain/ data/               unit tests, and repository tests on an in-memory database
+  application/                 command, review and startup tests
+  presentation/                widget tests
+  support/                     shared test fakes, container and database helpers
+  fixtures/mindstack/          sample .mindstack files
+android/ ios/ web/ ...         platform folders generated by flutter create
 ```
 
 ## Packages
@@ -72,9 +86,18 @@ android/ ios/ web/ ...      platform folders generated by flutter create
 | go_router | Navigation and routes | BSD-3-Clause | In use |
 | fl_chart | Progress charts (mastery by deck) | MIT | In use |
 | lucide_icons_flutter | Lucide icons, the same set as the Figma file | MIT | In use |
+| drift | Type-safe SQLite database | MIT | In use |
+| drift_flutter | Opens the drift database on Android, iOS and desktop | MIT | In use |
+| path_provider | Finds the app's storage folder for the database file | BSD-3-Clause | In use |
+| sqlite3 | Reads SQLite error codes to show clear save errors | MIT | In use |
+| uuid | Generates unique ids | MIT | In use |
 | flutter_lints | Lint rules | BSD-3-Clause | In use (dev) |
+| drift_dev | Generates the drift database code | MIT | In use (dev) |
+| build_runner | Runs the code generators | BSD-3-Clause | In use (dev) |
 
-Planned for Phase 3 (not added yet): drift (type-safe SQLite) for local storage, shared_preferences for settings, image_picker and file_picker for import, google_mlkit_text_recognition for on-device OCR, flutter_tts for read-aloud, flutter_local_notifications for study reminders, share_plus for sharing decks as .mindstack files. Each will be recorded here with its purpose and license when it is added.
+The generated drift code (`lib/data/database/app_database.g.dart`) is committed, so a fresh checkout runs after `flutter pub get` with no build step. After changing a table, run `dart run build_runner build --delete-conflicting-outputs` and commit the result.
+
+Planned for Phase 3 (not added yet): shared_preferences for settings, image_picker and file_picker for import, google_mlkit_text_recognition for on-device OCR, flutter_tts for read-aloud, flutter_local_notifications for study reminders, share_plus for sharing decks as .mindstack files. Each will be recorded here with its purpose and license when it is added.
 
 ## Fonts and icons
 

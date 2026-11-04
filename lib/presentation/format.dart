@@ -1,0 +1,35 @@
+import '../core/dates.dart';
+
+const List<String> _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// Formats a date like "Nov 18, 2026".
+String formatDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
+
+/// Short interval label for rating buttons, e.g. "<10M", "1D", "12D".
+String formatInterval(Duration d) {
+  if (d.inMinutes < 60) return '<${d.inMinutes + 1}M';
+  if (d.inHours < 24) return '${d.inHours}H';
+  return '${(d.inHours / 24).round()}D';
+}
+
+/// "Today", "Tomorrow" or a date, used for the next due review. [now] is the
+/// current time from the injected clock.
+String formatDueDay(DateTime due, DateTime now) {
+  final days = dateOnly(due).difference(dateOnly(now)).inDays;
+  if (days <= 0) return 'Today';
+  if (days == 1) return 'Tomorrow';
+  return formatDate(due);
+}
