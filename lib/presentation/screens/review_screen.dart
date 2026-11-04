@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../application/cards.dart';
-import '../../application/core_providers.dart';
 import '../../application/library.dart';
 import '../../application/review.dart';
+import '../../application/services.dart';
 import '../../application/settings.dart';
 import '../../domain/enums.dart';
 import '../../domain/models/deck.dart';

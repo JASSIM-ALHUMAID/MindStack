@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mindstack/application/cards.dart';
 import 'package:mindstack/application/core_providers.dart';
 import 'package:mindstack/application/library.dart';
+import 'package:mindstack/application/services.dart';
 import 'package:mindstack/application/startup.dart';
 import 'package:mindstack/domain/failures.dart';
 import 'package:mindstack/domain/repositories.dart';

@@ -4,9 +4,6 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../core/clock.dart';
-import '../core/ids.dart';
-import '../core/logger.dart';
 import '../data/database/app_database.dart';
 import '../data/drift_transaction_runner.dart';
 import '../data/repositories/drift_card_repository.dart';
@@ -17,15 +14,7 @@ import '../data/sample_data.dart';
 import '../data/seed.dart';
 import '../domain/models/quiz_question.dart';
 import '../domain/repositories.dart';
-
-/// The time source. Override in tests with a fixed clock.
-final clockProvider = Provider<Clock>((ref) => const SystemClock());
-
-/// The id source. Override in tests with a sequential generator.
-final idGeneratorProvider = Provider<IdGenerator>((ref) => UuidGenerator());
-
-/// The error log. Override in tests to record calls.
-final loggerProvider = Provider<AppLogger>((ref) => const FlutterAppLogger());
+import 'services.dart';
 
 /// The app database. Invalidating it closes the current database and opens a
 /// fresh one, which is how startup Retry recovers from a failed open.

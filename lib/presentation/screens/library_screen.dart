@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../application/cards.dart';
-import '../../application/core_providers.dart';
 import '../../application/library.dart';
+import '../../application/services.dart';
 import '../../domain/models/course.dart';
 import '../../domain/models/deck.dart';
 import '../../domain/models/deck_stats.dart';

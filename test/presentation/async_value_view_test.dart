@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mindstack/application/core_providers.dart';
+import 'package:mindstack/application/services.dart';
 import 'package:mindstack/domain/failures.dart';
 import 'package:mindstack/presentation/widgets/async_value_view.dart';
 

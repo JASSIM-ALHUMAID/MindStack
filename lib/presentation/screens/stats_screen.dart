@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/cards.dart';
-import '../../application/core_providers.dart';
 import '../../application/library.dart';
 import '../../application/review.dart';
+import '../../application/services.dart';
 import '../../application/tab.dart';
 import '../../core/dates.dart';
 import '../../domain/models/deck.dart';

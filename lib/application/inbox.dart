@@ -4,6 +4,7 @@ import '../domain/failures.dart';
 import '../domain/models/draft_card.dart';
 import '../domain/models/flashcard.dart';
 import 'core_providers.dart';
+import 'services.dart';
 
 /// Live list of OCR drafts awaiting a decision.
 final draftsProvider = StreamProvider<List<DraftCard>>(

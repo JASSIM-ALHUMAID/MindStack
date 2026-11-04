@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/core_providers.dart';
+import '../../application/services.dart';
 import '../save_feedback.dart';
 import 'common.dart';
 

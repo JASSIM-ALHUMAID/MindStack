@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../application/core_providers.dart';
 import '../../application/library.dart';
+import '../../application/services.dart';
 import '../../core/dates.dart';
 import '../../theme/app_theme.dart';
 import '../format.dart';

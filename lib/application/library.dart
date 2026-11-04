@@ -5,6 +5,7 @@ import '../domain/failures.dart';
 import '../domain/models/course.dart';
 import '../domain/models/deck.dart';
 import 'core_providers.dart';
+import 'services.dart';
 import 'validation.dart';
 
 /// Live list of courses, ordered by exam date then title.

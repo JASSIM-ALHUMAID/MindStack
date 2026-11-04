@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mindstack/application/cards.dart';
 import 'package:mindstack/application/core_providers.dart';
 import 'package:mindstack/application/library.dart';
+import 'package:mindstack/application/services.dart';
 import 'package:mindstack/application/startup.dart';
 import 'package:mindstack/data/repositories/drift_library_repository.dart';
 import 'package:mindstack/domain/failures.dart';

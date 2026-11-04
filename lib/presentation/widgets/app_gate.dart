@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/core_providers.dart';
+import '../../application/services.dart';
 import '../../application/startup.dart';
 import '../../theme/app_theme.dart';
 
@@ -26,7 +26,7 @@ class AppGate extends ConsumerWidget {
       error: (error, stack) => _StartupError(
         error: error,
         stack: stack,
-        onRetry: () => ref.invalidate(databaseProvider),
+        onRetry: ref.read(startupRetryProvider),
       ),
     );
   }

@@ -6,9 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../application/cards.dart';
-import '../../application/core_providers.dart';
 import '../../application/library.dart';
 import '../../application/review.dart';
+import '../../application/services.dart';
 import '../../application/tab.dart';
 import '../../domain/models/deck.dart';
 import '../../domain/models/flashcard.dart';
