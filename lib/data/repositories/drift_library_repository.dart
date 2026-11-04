@@ -30,7 +30,10 @@ final class DriftLibraryRepository implements LibraryRepository {
   @override
   Stream<List<Deck>> watchDecks() {
     final query = _db.select(_db.decks)
-      ..orderBy([(t) => OrderingTerm.asc(t.title)]);
+      ..orderBy([
+        // Titles are unique case-insensitively, so sort the same way.
+        (t) => OrderingTerm.asc(t.title.collate(Collate.noCase)),
+      ]);
     return guardStream(
       query.watch().map((rows) => [for (final r in rows) r.toModel()]),
     );

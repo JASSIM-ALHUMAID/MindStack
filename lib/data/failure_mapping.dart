@@ -62,11 +62,15 @@ AppFailure _translate(
     switch (cause.extendedResultCode) {
       case _primaryKeyViolation:
         return const Conflict(ConflictKind.duplicateId);
+      // Today's schema has one UNIQUE constraint (deck title per course);
+      // revisit this mapping when another unique constraint is added.
       case _uniqueViolation:
         return const Conflict(ConflictKind.duplicateTitle);
       case _foreignKeyViolation:
         return onForeignKey?.call() ??
             const NotFound(entity: 'related item', id: '');
+      // Today's CHECK constraints all guard required text; revisit this
+      // message when a different kind of CHECK is added.
       case _checkViolation:
         return const InvalidInput(
           field: 'text',

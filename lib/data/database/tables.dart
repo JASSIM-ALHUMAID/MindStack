@@ -41,6 +41,9 @@ class Decks extends Table {
 
 @DataClassName('FlashcardRow')
 @TableIndex(name: 'flashcards_deck_id', columns: {#deckId})
+// Note: drift compares text DateTimes through julianday(), so SQLite cannot
+// use this index for `CardRepository.due`. Kept for plain dueAt lookups and
+// in case that query changes.
 @TableIndex(name: 'flashcards_due_at', columns: {#dueAt})
 class Flashcards extends Table {
   TextColumn get id => text()();

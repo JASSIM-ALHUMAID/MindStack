@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../core/clock.dart';
 import '../core/ids.dart';
@@ -29,7 +30,17 @@ final loggerProvider = Provider<AppLogger>((ref) => const FlutterAppLogger());
 /// The app database. Invalidating it closes the current database and opens a
 /// fresh one, which is how startup Retry recovers from a failed open.
 final databaseProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase(driftDatabase(name: 'mindstack'));
+  final db = AppDatabase(
+    driftDatabase(
+      name: 'mindstack',
+      // The application support directory, not the default documents
+      // directory, so the file does not appear in the user's Documents folder
+      // on desktop platforms.
+      native: const DriftNativeOptions(
+        databaseDirectory: getApplicationSupportDirectory,
+      ),
+    ),
+  );
   // Provider disposal is synchronous, so the asynchronous close is started
   // here and deliberately not awaited.
   ref.onDispose(() => unawaited(db.close()));

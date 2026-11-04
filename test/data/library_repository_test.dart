@@ -46,6 +46,17 @@ void main() {
     expect(await repo.watchDecks().first, [a, z]);
   });
 
+  test('decks ordered by title ignoring case', () async {
+    await repo.insertCourse(_course('c1', 'Mobile', DateTime(2026, 12, 1)));
+    const upperB = Deck(id: 'd1', courseId: 'c1', title: 'Beta');
+    const lowerA = Deck(id: 'd2', courseId: 'c1', title: 'alpha');
+    const upperC = Deck(id: 'd3', courseId: 'c1', title: 'Charlie');
+    for (final deck in [upperB, upperC, lowerA]) {
+      await repo.insertDeck(deck);
+    }
+    expect(await repo.watchDecks().first, [lowerA, upperB, upperC]);
+  });
+
   test('deckById returns the deck, unknown id throws NotFound', () async {
     await repo.insertCourse(_course('c1', 'Mobile', DateTime(2026, 12, 1)));
     const deck = Deck(id: 'd1', courseId: 'c1', title: 'Alpha');
