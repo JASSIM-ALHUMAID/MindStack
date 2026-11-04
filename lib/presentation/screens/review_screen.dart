@@ -28,14 +28,16 @@ class ReviewScreen extends ConsumerStatefulWidget {
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   // Temporary UI detail owned by this screen only, so plain setState is enough.
-  bool _showAnswer = false;
+  // The answer is revealed for one card id, so any change of card (rating,
+  // Skip, Study, Drill) hides it again.
+  String? _revealedId;
 
   Future<void> _rate(Rating rating) async {
     final notifier = ref.read(reviewProvider.notifier);
     final rated = await runSave(context, ref, () => notifier.rate(rating));
     // On failure the same card stays up with its answer shown, so the user
     // can pick a rating again.
-    if (rated && mounted) setState(() => _showAnswer = false);
+    if (rated && mounted) setState(() => _revealedId = null);
   }
 
   @override
@@ -116,9 +118,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                     card: card,
                     number: review.index + 1,
                     total: total,
-                    showAnswer: _showAnswer,
+                    showAnswer: _revealedId == card.id,
                     saving: review.saving,
-                    onFlip: () => setState(() => _showAnswer = !_showAnswer),
+                    onFlip: () => setState(
+                      () =>
+                          _revealedId = _revealedId == card.id ? null : card.id,
+                    ),
                     onRate: (rating) => unawaited(_rate(rating)),
                   ),
           ),

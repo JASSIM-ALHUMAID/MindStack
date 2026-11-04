@@ -158,4 +158,50 @@ void main() {
     expect(find.text('Next question'), findsOneWidget);
     expect(find.text('This card no longer exists.'), findsNothing);
   });
+
+  testWidgets('skipping a deleted card shows the next card with its answer '
+      'hidden', (tester) async {
+    tester.view.physicalSize = const Size(800, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final container = makeContainer();
+    await container.read(appStartupProvider.future);
+    final db = container.read(databaseProvider);
+    await db.delete(db.flashcards).go();
+    final library = container.read(libraryCommandsProvider);
+    final course = await library.createCourse(
+      title: 'Course',
+      examDate: DateTime(2026, 12, 1),
+    );
+    final deckId = await library.createDeck(courseId: course, title: 'Deck');
+    final cards = container.read(cardCommandsProvider);
+    final first = await cards.addCard(
+      deckId: deckId,
+      question: 'First question',
+      answer: 'First answer',
+    );
+    await cards.addCard(
+      deckId: deckId,
+      question: 'Second question',
+      answer: 'Second answer',
+    );
+
+    await pumpInApp(tester, container, const ReviewScreen());
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+    await tester.tap(find.text('First question'));
+    await tester.pump();
+    expect(find.text('First answer'), findsOneWidget);
+    await cards.deleteCard(first);
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Second question'), findsOneWidget);
+    expect(find.text('Second answer'), findsNothing);
+  });
 }
