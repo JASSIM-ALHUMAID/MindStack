@@ -17,6 +17,8 @@ part 'app_database.g.dart';
   tables: [Courses, Decks, Flashcards, DraftCards, ReviewLogs, Meta],
 )
 class AppDatabase extends _$AppDatabase {
+  /// Opens the database on the executor [e]. Use `driftDatabase` in the app
+  /// and `NativeDatabase.memory()` in tests.
   AppDatabase(super.e);
 
   @override

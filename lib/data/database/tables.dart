@@ -9,6 +9,7 @@ import 'converters.dart';
 // Constraints live in the store so no code path can bypass them. Text columns
 // are checked with `trim()` so whitespace-only values are rejected too.
 
+/// A course with its exam date. Rows are read as `CourseRow`.
 @DataClassName('CourseRow')
 class Courses extends Table {
   TextColumn get id => text()();
@@ -20,6 +21,7 @@ class Courses extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// A deck inside a course. Deleting the course deletes its decks.
 @DataClassName('DeckRow')
 @TableIndex(name: 'decks_course_id', columns: {#courseId})
 class Decks extends Table {
@@ -39,6 +41,8 @@ class Decks extends Table {
   ];
 }
 
+/// A flashcard with its spaced-repetition state. Deleting the deck deletes
+/// its cards.
 @DataClassName('FlashcardRow')
 @TableIndex(name: 'flashcards_deck_id', columns: {#deckId})
 // Note: drift compares text DateTimes through julianday(), so SQLite cannot
@@ -73,6 +77,7 @@ class Flashcards extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// An unsaved OCR draft card, held until the user saves or clears it.
 @DataClassName('DraftCardRow')
 class DraftCards extends Table {
   TextColumn get id => text()();
@@ -86,6 +91,7 @@ class DraftCards extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// One rating of a card. Deleting the card deletes its log entries.
 @DataClassName('ReviewLogRow')
 @TableIndex(name: 'review_logs_card_id', columns: {#cardId})
 @TableIndex(name: 'review_logs_reviewed_at', columns: {#reviewedAt})
@@ -102,6 +108,7 @@ class ReviewLogs extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Key/value bookkeeping, such as the `seeded` flag.
 @DataClassName('MetaRow')
 class Meta extends Table {
   TextColumn get key => text()();

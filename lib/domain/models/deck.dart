@@ -3,8 +3,13 @@ class Deck {
   /// Creates a deck.
   const Deck({required this.id, required this.courseId, required this.title});
 
+  /// Stable unique id.
   final String id;
+
+  /// Id of the course this deck belongs to.
   final String courseId;
+
+  /// Deck name, unique within its course ignoring letter case.
   final String title;
 
   @override

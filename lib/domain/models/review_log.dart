@@ -11,10 +11,19 @@ class ReviewLog {
     required this.elapsedMs,
   });
 
+  /// Stable unique id.
   final String id;
+
+  /// Id of the card that was rated.
   final String cardId;
+
+  /// When the rating was made.
   final DateTime reviewedAt;
+
+  /// The rating the user chose.
   final Rating rating;
+
+  /// Time spent on the card before rating, in milliseconds.
   final int elapsedMs;
 
   @override

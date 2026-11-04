@@ -12,13 +12,25 @@ class DraftCard {
     this.selected = true,
   });
 
+  /// Stable unique id.
   final String id;
+
+  /// Where the text came from (slide, PDF, photo, shared file).
   final CardSource source;
+
+  /// Human-readable origin, for example "Page 2".
   final String sourceRef;
+
+  /// The recognised question text.
   final String question;
+
+  /// The recognised answer text.
   final String answer;
+
+  /// Whether the user has ticked this draft for saving.
   final bool selected;
 
+  /// A copy with [selected] replaced; every other field is kept.
   DraftCard copyWith({bool? selected}) {
     return DraftCard(
       id: id,

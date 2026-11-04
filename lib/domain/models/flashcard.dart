@@ -17,26 +17,45 @@ class Flashcard {
     this.mastery = 0,
   });
 
+  /// Stable unique id.
   final String id;
+
+  /// Id of the deck this card belongs to.
   final String deckId;
+
+  /// Front of the card.
   final String question;
+
+  /// Back of the card.
   final String answer;
+
+  /// How the card was created.
   final CardSource source;
 
   /// Example: "Page 2", "Lecture 1", "Whiteboard #1".
   final String? sourceRef;
 
   // Spaced-repetition fields (SM-2 style).
+  /// Days until the next review after the last rating.
   final int intervalDays;
+
+  /// SM-2 ease factor; never below 1.3.
   final double ease;
+
+  /// Consecutive successful reviews (0 for a new card).
   final int repetitions;
+
+  /// When the card is next due for review.
   final DateTime dueAt;
 
   /// 0.0 to 1.0, shown as a percentage in the Deck Editor and Stats.
   final double mastery;
 
+  /// Whether the card has never been reviewed successfully.
   bool get isNew => repetitions == 0;
 
+  /// A copy with the given fields replaced. `id`, `source` and `sourceRef`
+  /// never change.
   Flashcard copyWith({
     String? deckId,
     String? question,

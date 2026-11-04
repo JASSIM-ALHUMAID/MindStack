@@ -13,12 +13,25 @@ class QuizQuestion {
     this.difficulty = Difficulty.moderate,
   });
 
+  /// Stable unique id.
   final String id;
+
+  /// The question text.
   final String prompt;
+
+  /// The answer choices, in display order.
   final List<String> options;
+
+  /// Index into [options] of the right answer.
   final int correctIndex;
+
+  /// Why the right answer is right, shown after answering.
   final String explanation;
+
+  /// Points awarded for a correct answer.
   final int points;
+
+  /// How hard the question is.
   final Difficulty difficulty;
 
   bool _sameOptions(List<String> other) {

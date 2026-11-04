@@ -19,9 +19,16 @@ class SeedData {
     required this.drafts,
   });
 
+  /// Courses to insert.
   final List<Course> courses;
+
+  /// Decks to insert; each refers to a course in [courses].
   final List<Deck> decks;
+
+  /// Cards to insert; each refers to a deck in [decks].
   final List<Flashcard> cards;
+
+  /// Unsaved OCR drafts to insert.
   final List<DraftCard> drafts;
 }
 

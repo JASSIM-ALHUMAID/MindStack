@@ -5,8 +5,13 @@ class Course {
   /// Creates a course. [examDate] is a calendar date (local midnight).
   const Course({required this.id, required this.title, required this.examDate});
 
+  /// Stable unique id.
   final String id;
+
+  /// Course name, for example "Mobile Development".
   final String title;
+
+  /// Exam day as a calendar date (local midnight).
   final DateTime examDate;
 
   /// Whole days from [now]'s date until the exam (negative once it passed).
