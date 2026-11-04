@@ -37,6 +37,15 @@ final class DriftLibraryRepository implements LibraryRepository {
   }
 
   @override
+  Future<Deck> deckById(String id) => guard(() async {
+    final row = await (_db.select(
+      _db.decks,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (row == null) throw NotFound(entity: 'deck', id: id);
+    return row.toModel();
+  });
+
+  @override
   Future<void> insertCourse(Course course) =>
       guard(() => _db.into(_db.courses).insert(course.toCompanion()));
 

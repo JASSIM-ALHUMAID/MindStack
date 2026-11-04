@@ -103,10 +103,14 @@ final class LibraryCommands {
       );
     }
     return await _ref.read(transactionRunnerProvider).run(() async {
+      // Moving zero cards would not trip a foreign key, so check both decks.
+      final library = _ref.read(libraryRepositoryProvider);
+      await library.deckById(fromId);
+      await library.deckById(toId);
       final moved = await _ref
           .read(cardRepositoryProvider)
           .moveToDeck(fromDeckId: fromId, toDeckId: toId);
-      await _ref.read(libraryRepositoryProvider).deleteDeck(fromId);
+      await library.deleteDeck(fromId);
       return moved;
     });
   }

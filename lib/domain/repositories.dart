@@ -19,6 +19,9 @@ abstract interface class LibraryRepository {
   /// Decks ordered by title.
   Stream<List<Deck>> watchDecks();
 
+  /// The deck with [id]. Throws `NotFound` if it does not exist.
+  Future<Deck> deckById(String id);
+
   /// Throws `Conflict` on a duplicate id.
   Future<void> insertCourse(Course course);
 

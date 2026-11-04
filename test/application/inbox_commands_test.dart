@@ -4,12 +4,40 @@ import 'package:mindstack/application/cards.dart';
 import 'package:mindstack/application/core_providers.dart';
 import 'package:mindstack/application/inbox.dart';
 import 'package:mindstack/application/library.dart';
+import 'package:mindstack/data/repositories/drift_draft_repository.dart';
 import 'package:mindstack/domain/enums.dart';
 import 'package:mindstack/domain/failures.dart';
 import 'package:mindstack/domain/models/draft_card.dart';
+import 'package:mindstack/domain/repositories.dart';
 
 import '../support/container.dart';
 import '../support/fakes.dart';
+
+/// Delegates to [_inner] except that [delete] always fails.
+final class _FailingDeleteDrafts implements DraftRepository {
+  _FailingDeleteDrafts(this._inner);
+
+  final DraftRepository _inner;
+
+  @override
+  Stream<List<DraftCard>> watchAll() => _inner.watchAll();
+
+  @override
+  Future<List<DraftCard>> selected() => _inner.selected();
+
+  @override
+  Future<void> insertAll(List<DraftCard> drafts) => _inner.insertAll(drafts);
+
+  @override
+  Future<void> toggleSelected(String id) => _inner.toggleSelected(id);
+
+  @override
+  Future<void> delete(Iterable<String> ids) async =>
+      throw StorageFailure(StateError('disk full'), StackTrace.current);
+
+  @override
+  Future<void> clear() => _inner.clear();
+}
 
 final _now = DateTime(2026, 11, 4, 12);
 
@@ -77,22 +105,59 @@ void main() {
     );
   });
 
-  test('saveSelectedTo rolls back when inserting cards fails', () async {
-    final container = makeContainer();
-    await container.read(draftRepositoryProvider).insertAll([
-      _draft('a'),
-      _draft('b'),
-    ]);
+  test(
+    'saveSelectedTo into a missing deck throws NotFound, drafts unchanged',
+    () async {
+      final container = makeContainer();
+      await container.read(draftRepositoryProvider).insertAll([
+        _draft('a'),
+        _draft('b'),
+      ]);
 
-    await expectLater(
-      container.read(inboxCommandsProvider).saveSelectedTo('missing-deck'),
-      throwsA(isA<NotFound>()),
-    );
+      await expectLater(
+        container.read(inboxCommandsProvider).saveSelectedTo('missing-deck'),
+        throwsA(isA<NotFound>()),
+      );
 
-    final drafts = await container.read(draftsProvider.future);
-    expect([for (final d in drafts) d.id], ['a', 'b']);
-    expect(await container.read(allCardsProvider.future), isEmpty);
-  });
+      final drafts = await container.read(draftsProvider.future);
+      expect([for (final d in drafts) d.id], ['a', 'b']);
+      expect(await container.read(allCardsProvider.future), isEmpty);
+    },
+  );
+
+  test(
+    'saveSelectedTo rolls back inserted cards when deleting drafts fails',
+    () async {
+      final container = makeContainer(
+        overrides: [
+          draftRepositoryProvider.overrideWith(
+            (ref) => _FailingDeleteDrafts(
+              DriftDraftRepository(ref.watch(databaseProvider)),
+            ),
+          ),
+        ],
+      );
+      final deck = await _deck(container);
+      await container.read(draftRepositoryProvider).insertAll([
+        _draft('a'),
+        _draft('b', selected: false),
+        _draft('c'),
+      ]);
+
+      await expectLater(
+        container.read(inboxCommandsProvider).saveSelectedTo(deck),
+        throwsA(isA<StorageFailure>()),
+      );
+
+      // The cards were inserted before the failure, so only a rollback removes them.
+      expect(await container.read(deckCardsProvider(deck).future), isEmpty);
+      final drafts = await container.read(draftsProvider.future);
+      expect(
+        [for (final d in drafts) (d.id, d.selected)],
+        [('a', true), ('b', false), ('c', true)],
+      );
+    },
+  );
 
   test('toggle twice restores selection', () async {
     final container = makeContainer();

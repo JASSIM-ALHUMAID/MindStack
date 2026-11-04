@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
@@ -85,7 +86,7 @@ void main() {
             opened.isEmpty ? _failingExecutor() : NativeDatabase.memory(),
           );
           opened.add(db);
-          ref.onDispose(() async => db.close());
+          ref.onDispose(() => unawaited(db.close()));
           return db;
         }),
       ],

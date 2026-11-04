@@ -46,6 +46,14 @@ void main() {
     expect(await repo.watchDecks().first, [a, z]);
   });
 
+  test('deckById returns the deck, unknown id throws NotFound', () async {
+    await repo.insertCourse(_course('c1', 'Mobile', DateTime(2026, 12, 1)));
+    const deck = Deck(id: 'd1', courseId: 'c1', title: 'Alpha');
+    await repo.insertDeck(deck);
+    expect(await repo.deckById('d1'), deck);
+    await expectLater(repo.deckById('nope'), throwsA(isA<NotFound>()));
+  });
+
   test('insertDeck with unknown course throws NotFound(course)', () async {
     await expectLater(
       repo.insertDeck(const Deck(id: 'd1', courseId: 'nope', title: 'X')),

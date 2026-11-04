@@ -24,6 +24,9 @@ final class _FailingDeleteLibrary implements LibraryRepository {
   Stream<List<Deck>> watchDecks() => _inner.watchDecks();
 
   @override
+  Future<Deck> deckById(String id) => _inner.deckById(id);
+
+  @override
   Future<void> insertCourse(Course course) => _inner.insertCourse(course);
 
   @override
@@ -174,6 +177,58 @@ void main() {
             'Choose a different deck to merge into.',
           ),
         ),
+      );
+    });
+
+    test(
+      'into a missing deck throws NotFound and keeps a non-empty source',
+      () async {
+        final container = makeContainer();
+        final decks = await arrange(container);
+
+        await expectLater(
+          container
+              .read(libraryCommandsProvider)
+              .mergeDecks(fromId: decks.from, toId: 'missing'),
+          throwsA(isA<NotFound>()),
+        );
+
+        final remaining = await container.read(decksProvider.future);
+        expect([for (final d in remaining) d.id], contains(decks.from));
+        expect(
+          await container.read(deckCardsProvider(decks.from).future),
+          hasLength(2),
+        );
+      },
+    );
+
+    test(
+      'into a missing deck throws NotFound and keeps an empty source',
+      () async {
+        final container = makeContainer();
+        final library = container.read(libraryCommandsProvider);
+        final course = await library.createCourse(title: 'C', examDate: _exam);
+        final from = await library.createDeck(courseId: course, title: 'Empty');
+
+        await expectLater(
+          library.mergeDecks(fromId: from, toId: 'missing'),
+          throwsA(isA<NotFound>()),
+        );
+
+        final remaining = await container.read(decksProvider.future);
+        expect([for (final d in remaining) d.id], [from]);
+      },
+    );
+
+    test('from a missing deck throws NotFound', () async {
+      final container = makeContainer();
+      final decks = await arrange(container);
+
+      await expectLater(
+        container
+            .read(libraryCommandsProvider)
+            .mergeDecks(fromId: 'missing', toId: decks.to),
+        throwsA(isA<NotFound>()),
       );
     });
 
