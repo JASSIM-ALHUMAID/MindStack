@@ -4,6 +4,8 @@ import '../domain/enums.dart';
 import '../domain/failures.dart';
 import '../domain/models/deck_stats.dart';
 import '../domain/models/flashcard.dart';
+import '../domain/models/review_log.dart';
+import '../domain/models/review_result.dart';
 import '../domain/scheduler.dart';
 import 'core_providers.dart';
 import 'services.dart';
@@ -79,20 +81,47 @@ final class CardCommands {
       _ref.read(cardRepositoryProvider).delete(id);
 
   /// Reschedules card [id] for [rating] at the current time and returns the
-  /// stored card. The read and the write share one transaction.
+  /// stored card. The schedule update and review log share one transaction.
+  /// [elapsedMs] is time spent on this card, excluding the database write.
+  /// It defaults to zero for callers that do not measure time yet.
   ///
-  /// Throws [NotFound] if the card does not exist and [StorageFailure] if a
-  /// storage call fails.
-  Future<Flashcard> rateCard(String id, Rating rating) {
+  /// Throws [InvalidInput] for negative elapsed time, [NotFound] if the card
+  /// does not exist, [Conflict] for a duplicate log id, and [StorageFailure]
+  /// if a storage call fails. A failed write rolls back both changes.
+  Future<Flashcard> rateCard(
+    String id,
+    Rating rating, {
+    int elapsedMs = 0,
+  }) async => (await recordRating(id, rating, elapsedMs: elapsedMs)).card;
+
+  /// Same atomic write as [rateCard], returning the exact committed log and
+  /// rated card so a session can summarize only its own successful reviews.
+  Future<ReviewResult> recordRating(
+    String id,
+    Rating rating, {
+    int elapsedMs = 0,
+  }) async {
+    if (elapsedMs < 0) {
+      throw const InvalidInput(
+        field: 'elapsedMs',
+        reason: 'Review time cannot be negative.',
+      );
+    }
     return _ref.read(transactionRunnerProvider).run(() async {
       final cards = _ref.read(cardRepositoryProvider);
-      final rated = Sm2Scheduler.apply(
-        await cards.byId(id),
-        rating,
-        now: _ref.read(clockProvider).now(),
-      );
+      final card = await cards.byId(id);
+      final now = _ref.read(clockProvider).now();
+      final rated = Sm2Scheduler.apply(card, rating, now: now);
       await cards.update(rated);
-      return rated;
+      final log = ReviewLog(
+        id: _ref.read(idGeneratorProvider).newId(),
+        cardId: id,
+        reviewedAt: now,
+        rating: rating,
+        elapsedMs: elapsedMs,
+      );
+      await _ref.read(reviewLogRepositoryProvider).insert(log);
+      return ReviewResult(card: rated, log: log);
     });
   }
 }

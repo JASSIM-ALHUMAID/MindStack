@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../application/cards.dart';
 import '../../application/library.dart';
 import '../../application/review.dart';
 import '../../application/services.dart';
@@ -28,9 +27,10 @@ class ReviewScreen extends ConsumerStatefulWidget {
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   // Temporary UI detail owned by this screen only, so plain setState is enough.
-  // The answer is revealed for one card id, so any change of card (rating,
-  // Skip, Study, Drill) hides it again.
+  // Revealing an answer belongs to one card in one session. A fresh session
+  // must hide it even when its first card has the same id as before.
   String? _revealedId;
+  int? _revealedSessionId;
 
   Future<void> _rate(Rating rating) async {
     final notifier = ref.read(reviewProvider.notifier);
@@ -89,13 +89,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           Text('$done / $total CARDS ($percent%)', style: kMonoLabel),
           const SizedBox(height: 16),
         ],
-        if (total == 0)
-          const SoftCard(
-            padding: EdgeInsets.all(32),
-            child: Center(child: Text('Nothing due right now.')),
-          )
-        else if (review.finished)
-          _SessionComplete(cardIds: review.cardIds)
+        if (review.finished)
+          _SessionComplete(review: review)
         else
           AsyncValueView<Flashcard?>(
             value: ref.watch(currentReviewCardProvider),
@@ -118,12 +113,17 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                     card: card,
                     number: review.index + 1,
                     total: total,
-                    showAnswer: _revealedId == card.id,
+                    showAnswer:
+                        _revealedId == card.id &&
+                        _revealedSessionId == review.sessionId,
                     saving: review.saving,
-                    onFlip: () => setState(
-                      () =>
-                          _revealedId = _revealedId == card.id ? null : card.id,
-                    ),
+                    onFlip: () => setState(() {
+                      final wasRevealed =
+                          _revealedId == card.id &&
+                          _revealedSessionId == review.sessionId;
+                      _revealedId = wasRevealed ? null : card.id;
+                      _revealedSessionId = review.sessionId;
+                    }),
                     onRate: (rating) => unawaited(_rate(rating)),
                   ),
           ),
@@ -328,37 +328,33 @@ class _RatingButton extends ConsumerWidget {
 }
 
 class _SessionComplete extends ConsumerWidget {
-  /// Ids of the cards in this session, in review order.
-  final List<String> cardIds;
+  final ReviewState review;
 
-  const _SessionComplete({required this.cardIds});
+  const _SessionComplete({required this.review});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return AsyncValueView<List<Flashcard>>(
-      value: ref.watch(allCardsProvider),
-      data: (cards) => AsyncValueView<List<Deck>>(
-        value: ref.watch(decksProvider),
-        data: (decks) => _buildSummary(ref, _reviewed(cards), decks),
-      ),
+    // The summary uses committed session receipts, so unrelated history or
+    // later card edits cannot change its counts, timing or assigned due date.
+    // Deck names are optional labels and need not block the summary loading.
+    return _buildSummary(
+      ref,
+      ref.watch(decksProvider).valueOrNull ?? const <Deck>[],
     );
   }
 
-  /// The session's cards as stored now, so intervals and due dates are the
-  /// ones after rating. Cards deleted since are skipped.
-  List<Flashcard> _reviewed(List<Flashcard> all) {
-    final byId = {for (final c in all) c.id: c};
-    return [for (final id in cardIds) ?byId[id]];
+  String _formatElapsed(int milliseconds) {
+    final duration = Duration(milliseconds: milliseconds);
+    if (duration.inMinutes == 0) {
+      return '${(milliseconds / 1000).toStringAsFixed(1)} s';
+    }
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '${duration.inMinutes}m ${seconds}s';
   }
 
-  Widget _buildSummary(
-    WidgetRef ref,
-    List<Flashcard> reviewed,
-    List<Deck> decks,
-  ) {
-    final nextDue = reviewed.isEmpty
-        ? null
-        : reviewed.map((c) => c.dueAt).reduce((a, b) => a.isBefore(b) ? a : b);
+  Widget _buildSummary(WidgetRef ref, List<Deck> decks) {
+    final reviewed = review.results.map((result) => result.card).toList();
+    final nextDue = review.nextDue;
 
     return Column(
       children: [
@@ -384,12 +380,29 @@ class _SessionComplete extends ConsumerWidget {
                 style: kSerifTitle.copyWith(fontSize: 24),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Nice work.',
-                style: TextStyle(color: AppColors.muted),
+              Text(
+                review.cardIds.isEmpty
+                    ? 'Nothing due right now.'
+                    : review.reviewedCount == 0
+                    ? 'No cards were rated in this session.'
+                    : 'Nice work.',
+                style: const TextStyle(color: AppColors.muted),
               ),
               const SizedBox(height: 12),
-              PillLabel('${cardIds.length} cards reviewed'),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  PillLabel('${review.reviewedCount} cards reviewed'),
+                  if (review.reviewedCount > 0) ...[
+                    PillLabel('Time: ${_formatElapsed(review.elapsedMs)}'),
+                    PillLabel(
+                      'Pace: ${review.secondsPerCard.toStringAsFixed(1)} s/card',
+                    ),
+                  ],
+                ],
+              ),
               if (nextDue != null) ...[
                 const SizedBox(height: 16),
                 Text(
@@ -401,45 +414,58 @@ class _SessionComplete extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => ref.read(reviewProvider.notifier).restart(),
+                  onPressed: () {
+                    final notifier = ref.read(reviewProvider.notifier);
+                    if (review.cardIds.isEmpty) {
+                      unawaited(notifier.start());
+                    } else {
+                      notifier.restart();
+                    }
+                  },
                   icon: const Icon(LucideIcons.rotateCcw),
-                  label: const Text('Review again'),
+                  label: Text(
+                    review.cardIds.isEmpty
+                        ? 'Check for due cards'
+                        : 'Review again',
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('CARDS REVIEWED', style: kMonoLabel),
-              for (final c in reviewed) ...[
-                const Divider(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(c.question),
-                          Text(
-                            '${decks.where((d) => d.id == c.deckId).firstOrNull?.title ?? ''}'
-                            ' · Interval ${c.intervalDays}d',
-                            style: kMonoMicro,
-                          ),
-                        ],
+        if (reviewed.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          SoftCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('CARDS REVIEWED', style: kMonoLabel),
+                for (final c in reviewed) ...[
+                  const Divider(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.question),
+                            Text(
+                              '${decks.where((d) => d.id == c.deckId).firstOrNull?.title ?? ''}'
+                              ' · Interval ${c.intervalDays}d',
+                              style: kMonoMicro,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    if (c.mastery >= 0.8)
-                      const PillLabel('Mastered', color: AppColors.success),
-                  ],
-                ),
+                      if (c.mastery >= 0.8)
+                        const PillLabel('Mastered', color: AppColors.success),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

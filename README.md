@@ -23,16 +23,16 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 - **Library:** courses with days to exam, decks with card count and mastery. + Course opens the Create Course sheet (title and exam date, with validation). + Deck on a course opens the Create Deck sheet and then the new deck.
 - **Deck Editor:** card list, Add Card sheet with validation, delete a card (Edit is a placeholder), Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
 - **Inbox:** draft cards with source pills and checkmarks, CLEAR, and Save selected → Choose deck sheet, which saves the ticked drafts as cards. Screenshots, PDF, Import a shared deck and EDIT are placeholders.
-- **Review:** flip card, four colored rating buttons that show each card's next interval, simplified SM-2 scheduling, session complete with the cards reviewed and the next due day.
+- **Review:** refreshed due-card queue, deck filtering, saved ratings and review logs, and session summaries showing count, time, pace and next due date.
 - **Quiz:** five sample questions, correct and wrong answer feedback with an explanation, results with accuracy and the questions missed, Review weak cards.
 - **Stats:** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
 
-Courses, decks, cards and OCR drafts are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. The Review queue is the exception (see below).
+Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. Review takes a fresh queue snapshot when a session starts and reads each current card live; it does not reorder the queue during a session.
 
 ### Known limitations (Phase 3 work)
 
-- The Review queue is a snapshot taken when the Review tab is first built (app start), and "Review again" replays that snapshot. Newly added or saved cards reach Review only through Study or Drill, or after a restart (Task 4 makes the queue live).
-- Settings (read-aloud, reminder time) live only for the current session and are not persisted. Review logs and quiz history are not wired to storage yet (later Phase 3 tasks). The quiz still asks sample questions and the Stats streak is placeholder history.
+- Review again repeats the previous queue. Timing does not pause while the app is in the background.
+- Settings (read-aloud, reminder time) live only for the current session and are not persisted. Quiz misses are not logged yet; the quiz still asks sample questions and the Stats streak is placeholder history.
 - Card editing, draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
 - The Review screen's read-aloud toggle (TTS ON/OFF) is saved for the session but does not speak yet; no text-to-speech package is added.
 

@@ -43,10 +43,17 @@ ThemeData buildAppTheme() {
     surfaceContainerHigh: AppColors.card,
     surfaceContainerHighest: AppColors.card,
   );
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme, fontFamily: AppFonts.sans);
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    fontFamily: AppFonts.sans,
+  );
   return base.copyWith(
     scaffoldBackgroundColor: AppColors.background,
-    textTheme: base.textTheme.apply(bodyColor: AppColors.ink, displayColor: AppColors.ink),
+    textTheme: base.textTheme.apply(
+      bodyColor: AppColors.ink,
+      displayColor: AppColors.ink,
+    ),
     dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1),
     dialogTheme: const DialogThemeData(backgroundColor: AppColors.card),
     datePickerTheme: const DatePickerThemeData(
@@ -55,7 +62,9 @@ ThemeData buildAppTheme() {
       surfaceTintColor: Colors.transparent,
     ),
     popupMenuTheme: const PopupMenuThemeData(color: AppColors.card),
-    bottomSheetTheme: const BottomSheetThemeData(backgroundColor: AppColors.card),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: AppColors.card,
+    ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.ink,
@@ -77,12 +86,16 @@ ThemeData buildAppTheme() {
       height: 68,
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
-          color: states.contains(WidgetState.selected) ? AppColors.primary : AppColors.muted,
+          color: states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.muted,
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => kMonoMicro.copyWith(
-          color: states.contains(WidgetState.selected) ? AppColors.primary : AppColors.muted,
+          color: states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.muted,
         ),
       ),
     ),
