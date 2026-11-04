@@ -18,19 +18,23 @@ class InboxState {
 
 class InboxNotifier extends Notifier<InboxState> {
   @override
-  InboxState build() => InboxState(drafts: List<DraftCard>.of(sampleDrafts));
+  InboxState build() => InboxState(
+    drafts: List<DraftCard>.of(buildSampleData(DateTime.now()).drafts),
+  );
 
   void toggle(String id) {
     state = InboxState(
       ocrProgress: state.ocrProgress,
       drafts: [
-        for (final d in state.drafts) d.id == id ? d.copyWith(selected: !d.selected) : d,
+        for (final d in state.drafts)
+          d.id == id ? d.copyWith(selected: !d.selected) : d,
       ],
     );
   }
 
   /// CLEAR in the Inbox header: removes every draft.
-  void clear() => state = InboxState(drafts: const [], ocrProgress: state.ocrProgress);
+  void clear() =>
+      state = InboxState(drafts: const [], ocrProgress: state.ocrProgress);
 
   /// Saves the selected drafts as cards in [deckId] and removes them from
   /// the inbox. Returns how many cards were saved.
@@ -58,5 +62,6 @@ class InboxNotifier extends Notifier<InboxState> {
   }
 }
 
-final inboxProvider =
-    NotifierProvider<InboxNotifier, InboxState>(InboxNotifier.new);
+final inboxProvider = NotifierProvider<InboxNotifier, InboxState>(
+  InboxNotifier.new,
+);

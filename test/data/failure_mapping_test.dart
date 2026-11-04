@@ -202,4 +202,10 @@ void main() {
     final titles = (await db.select(db.decks).get()).map((d) => d.title);
     expect(titles, unorderedEquals(['Flutter', 'Dart']));
   });
+
+  test('guardStream passes an AppFailure through unchanged', () async {
+    const failure = NotFound(entity: 'deck', id: 'd9');
+    final stream = guardStream<int>(Stream<int>.error(failure));
+    await expectLater(stream, emitsError(same(failure)));
+  });
 }

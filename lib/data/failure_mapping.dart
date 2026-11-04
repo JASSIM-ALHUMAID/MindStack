@@ -38,7 +38,7 @@ Stream<T> guardStream<T>(
   AppFailure Function()? onForeignKey,
 }) {
   return source.handleError((Object error, StackTrace stack) {
-    if (error is AppFailure) throw error;
+    if (error is AppFailure) Error.throwWithStackTrace(error, stack);
     Error.throwWithStackTrace(
       _translate(error, stack, onForeignKey),
       _stackOf(error, stack),

@@ -9,7 +9,8 @@ import '../domain/scheduler.dart';
 
 class CoursesNotifier extends Notifier<List<Course>> {
   @override
-  List<Course> build() => List<Course>.of(sampleCourses);
+  List<Course> build() =>
+      List<Course>.of(buildSampleData(DateTime.now()).courses);
 
   void add({required String title, required DateTime examDate}) {
     final id = 'c${DateTime.now().microsecondsSinceEpoch}';
@@ -17,12 +18,13 @@ class CoursesNotifier extends Notifier<List<Course>> {
   }
 }
 
-final coursesProvider =
-    NotifierProvider<CoursesNotifier, List<Course>>(CoursesNotifier.new);
+final coursesProvider = NotifierProvider<CoursesNotifier, List<Course>>(
+  CoursesNotifier.new,
+);
 
 class DecksNotifier extends Notifier<List<Deck>> {
   @override
-  List<Deck> build() => List<Deck>.of(sampleDecks);
+  List<Deck> build() => List<Deck>.of(buildSampleData(DateTime.now()).decks);
 
   /// Creates an empty deck in [courseId] and returns its id.
   String add({required String courseId, required String title}) {
@@ -34,12 +36,14 @@ class DecksNotifier extends Notifier<List<Deck>> {
   void remove(String id) => state = state.where((d) => d.id != id).toList();
 }
 
-final decksProvider =
-    NotifierProvider<DecksNotifier, List<Deck>>(DecksNotifier.new);
+final decksProvider = NotifierProvider<DecksNotifier, List<Deck>>(
+  DecksNotifier.new,
+);
 
 class CardsNotifier extends Notifier<List<Flashcard>> {
   @override
-  List<Flashcard> build() => List<Flashcard>.of(sampleCards);
+  List<Flashcard> build() =>
+      List<Flashcard>.of(buildSampleData(DateTime.now()).cards);
 
   void add(Flashcard card) => state = [...state, card];
 
@@ -50,21 +54,27 @@ class CardsNotifier extends Notifier<List<Flashcard>> {
   /// Moves every card of [fromDeckId] into [toDeckId] (deck merging).
   void moveToDeck(String fromDeckId, String toDeckId) {
     state = [
-      for (final c in state) c.deckId == fromDeckId ? c.copyWith(deckId: toDeckId) : c,
+      for (final c in state)
+        c.deckId == fromDeckId ? c.copyWith(deckId: toDeckId) : c,
     ];
   }
 
   void rate(String id, Rating rating) {
     state = [
-      for (final c in state) c.id == id ? Sm2Scheduler.apply(c, rating, now: DateTime.now()) : c,
+      for (final c in state)
+        c.id == id ? Sm2Scheduler.apply(c, rating, now: DateTime.now()) : c,
     ];
   }
 }
 
-final cardsProvider =
-    NotifierProvider<CardsNotifier, List<Flashcard>>(CardsNotifier.new);
+final cardsProvider = NotifierProvider<CardsNotifier, List<Flashcard>>(
+  CardsNotifier.new,
+);
 
-final deckCardsProvider = Provider.family<List<Flashcard>, String>((ref, deckId) {
+final deckCardsProvider = Provider.family<List<Flashcard>, String>((
+  ref,
+  deckId,
+) {
   return ref.watch(cardsProvider).where((c) => c.deckId == deckId).toList();
 });
 
