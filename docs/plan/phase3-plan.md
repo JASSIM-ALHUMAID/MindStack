@@ -144,7 +144,7 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 2: Settings with shared_preferences (supports F5 read-aloud toggle)
 
-**Files:** Modify `lib/providers/settings_provider.dart`, `pubspec.yaml`. Test: `test/providers/settings_provider_test.dart`.
+**Files:** Modify `lib/application/settings.dart`, `pubspec.yaml`. Test: `test/application/settings_test.dart`.
 
 **Interfaces:** Produces `SettingsNotifier` with `setTts(bool)` and `setReminderMinutes(int)` that persist; `SettingsState{ttsEnabled, reminderMinutes}` unchanged.
 
@@ -157,7 +157,7 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 3: Library and Deck Editor on persistent data (F3, F4)
 
-**Files:** Create `lib/widgets/edit_card_sheet.dart`, `lib/widgets/confirm_delete_dialog.dart`. Modify `lib/screens/deck_editor_screen.dart`, `lib/screens/library_screen.dart`, `lib/widgets/create_course_sheet.dart`, `lib/theme/app_theme.dart` (contrast). Test: `test/widgets/deck_editor_test.dart`, `test/providers/cards_provider_test.dart`.
+**Files:** Create `lib/presentation/widgets/edit_card_sheet.dart`, `lib/presentation/widgets/confirm_delete_dialog.dart`. Modify `lib/presentation/screens/deck_editor_screen.dart`, `lib/presentation/screens/library_screen.dart`, `lib/presentation/widgets/create_course_sheet.dart`, `lib/theme/app_theme.dart` (contrast). Test: `test/presentation/deck_editor_test.dart`, `test/application/card_commands_test.dart`.
 
 **Interfaces:**
 - Consumes: `CardRepository`, `allCardsProvider` / `deckCardsProvider`, `cardCommandsProvider` from Task 1.
@@ -170,7 +170,7 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 4: Review session on stored cards with ReviewLog (F5)
 
-**Files:** Modify `lib/providers/review_provider.dart`, `lib/screens/review_screen.dart`, `lib/providers/library_provider.dart` (rate writes log). Test: `test/providers/review_provider_test.dart`, `test/widgets/review_screen_test.dart`.
+**Files:** Modify `lib/application/review.dart`, `lib/presentation/screens/review_screen.dart`, `lib/application/library.dart` (rate writes log). Test: `test/application/review_test.dart`, `test/presentation/review_screen_test.dart`.
 
 **Interfaces:**
 - Consumes: `ReviewLogRepository.insert`, `CardRepository.update` (via `CardCommands.rateCard`).
@@ -181,7 +181,7 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 5: Quiz generated from stored cards (F6)
 
-**Files:** Modify `lib/providers/quiz_provider.dart`, `lib/screens/quiz_screen.dart`. Create `lib/utils/quiz_builder.dart`. Test: `test/utils/quiz_builder_test.dart`, `test/widgets/quiz_screen_test.dart`.
+**Files:** Modify `lib/application/quiz.dart`, `lib/presentation/screens/quiz_screen.dart`. Create `lib/domain/quiz_builder.dart`. Test: `test/domain/quiz_builder_test.dart`, `test/presentation/quiz_screen_test.dart`.
 
 **Interfaces:**
 - Produces: `List<QuizQuestion> buildQuiz(List<Flashcard> cards, {int count = 5, Random? random})`: correct answer is the card's answer, plus three answers from other cards (same deck first), `correctIndex` shuffled, `explanation` = the card's answer text, `points` 1 to 2 by `Difficulty` (from card mastery). Returns `[]` if fewer than 4 cards.
@@ -192,7 +192,7 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 6: Stats from real history (F7, target In progress, stretch Implemented)
 
-**Files:** Create `lib/providers/stats_provider.dart`. Modify `lib/screens/stats_screen.dart`. Test: `test/providers/stats_provider_test.dart`.
+**Files:** Create `lib/application/stats.dart`. Modify `lib/presentation/screens/stats_screen.dart`. Test: `test/application/stats_test.dart`.
 
 **Interfaces:**
 - Produces: `final streakProvider = Provider<StreakInfo>` (`current int`, `best int`, `days List<bool>` for the last 28 days, built from distinct `reviewedAt` dates); `final weakestCardsProvider = Provider<List<Flashcard>>` (lowest mastery first, max 3, cards with at least one log); `masteryByDeckProvider` for the fl_chart bars.
@@ -206,11 +206,11 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 7: Draft persistence, draft edit, import shared deck (F2, part of F8)
 
-**Files:** Create `lib/data/repositories/mindstack_file.dart`, `lib/widgets/edit_draft_sheet.dart`. Modify `lib/application/inbox.dart`, `lib/presentation/screens/inbox_screen.dart`, `pubspec.yaml` (`file_picker`). Test: `test/data/mindstack_file_test.dart`, `test/providers/inbox_provider_test.dart`, `test/widgets/inbox_screen_test.dart`.
+**Files:** Create `lib/data/repositories/mindstack_file.dart`, `lib/presentation/widgets/edit_draft_sheet.dart`. Modify `lib/application/inbox.dart`, `lib/presentation/screens/inbox_screen.dart`, `pubspec.yaml` (`file_picker`). Test: `test/data/mindstack_file_test.dart`, `test/application/inbox_commands_test.dart`, `test/presentation/inbox_screen_test.dart`.
 
 **Interfaces:**
 - Produces: `class MindstackFile { final String deckTitle; final List<MindstackCard> cards; }`, `MindstackFile.parse(String json)` (throws `FormatException` with a user-readable message on bad input), `String encode()`.
-- Produces: `InboxCommands.importShared() -> Future<void>` (added to `inboxCommandsProvider`): opens file_picker for `.mindstack`, parses, inserts drafts with `source = CardSource.shared`; state exposes `InboxStatus { idle, loading, error(message) }`.
+- Produces: `InboxCommands.importShared() -> Future<void>`: the file picking (file_picker for `.mindstack`) and the `InboxStatus { idle, loading, error(message) }` state live in an inbox import notifier/controller in `lib/application/inbox.dart`, so `InboxCommands` stays stateless (owner to confirm). It parses and inserts drafts with `source = CardSource.shared`.
 - Produces: `InboxCommands.updateDraft(String id, {String? question, String? answer})`, backed by a new `DraftRepository.update(DraftCard)` that throws `NotFound` for a missing draft.
 
 - [ ] **Step 1: Failing tests:** `test('parse round-trips encode')`; `test('parse rejects empty string, non-JSON and JSON without cards')` (Review Focus 5); `test('picker cancelled leaves drafts unchanged and status idle')`; `test('draft with empty question cannot be saved in the edit sheet')`; `test('saveSelectedTo removes drafts from DB and adds cards')`.
@@ -220,14 +220,14 @@ Files and steps below are the original plan; the Interfaces block describes what
 
 ### Task 8: Merge persisted (F8) and navigation audit
 
-**Files:** Modify `lib/screens/deck_editor_screen.dart` (merge calls `LibraryCommands.mergeDecks`, which already moves the cards with `CardRepository.moveToDeck` and deletes the source deck via `LibraryRepository.deleteDeck` in one transaction; this task adds the tests and the audit). Test: `test/widgets/navigation_test.dart`, `test/providers/merge_test.dart`.
+**Files:** Modify `lib/presentation/screens/deck_editor_screen.dart` (merge calls `LibraryCommands.mergeDecks`, which already moves the cards with `CardRepository.moveToDeck` and deletes the source deck via `LibraryRepository.deleteDeck` in one transaction; this task adds the tests and the audit). Test: `test/presentation/navigation_test.dart`, `test/application/merge_test.dart`.
 
 - [ ] **Step 1: Failing tests:** `test('merge moves cards and removes source deck, persisted')`; `test('merge into an empty deck works')`; `test('every tab and /deck/:id is reachable and back returns to Library')`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implement; fix the real nav gaps the audit finds. **Step 4:** PASS. **Step 5:** Commit.
 
 ### Task 9 (stretch, only after Task 8 merged): Share export, read-aloud
 
-**Files:** Modify `lib/screens/deck_editor_screen.dart`, `lib/screens/review_screen.dart`, `pubspec.yaml` (`share_plus`, `flutter_tts`). Test: `test/data/mindstack_file_test.dart` (encode only; share sheet is checked by hand).
+**Files:** Modify `lib/presentation/screens/deck_editor_screen.dart`, `lib/presentation/screens/review_screen.dart`, `pubspec.yaml` (`share_plus`, `flutter_tts`). Test: `test/data/mindstack_file_test.dart` (encode only; share sheet is checked by hand).
 
 - [ ] **Step 1:** Test `test('encode omits intervalDays, ease, dueAt, repetitions')`.
 - [ ] **Step 2:** Implement ⋮ → Share deck: write `<deck>.mindstack` to a temp dir, `Share.shareXFiles`. **Step 3:** TTS toggle speaks the question when a card is shown and the answer when flipped; off by default; stop on dispose. **Step 4:** Commit. This moves F8 to Implemented and F5 gets its read-aloud behavior.

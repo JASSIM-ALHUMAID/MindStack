@@ -27,11 +27,12 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 - **Quiz:** five sample questions, correct and wrong answer feedback with an explanation, results with accuracy and the questions missed, Review weak cards.
 - **Stats:** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
 
-Courses, decks, cards and OCR drafts are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Screens read live database queries, so they update as soon as a write completes.
+Courses, decks, cards and OCR drafts are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. The Review queue is the exception (see below).
 
 ### Known limitations (Phase 3 work)
 
-- Review logs, settings and quiz history are not wired to storage yet (later Phase 3 tasks). The quiz still asks sample questions and the Stats streak is placeholder history.
+- The Review queue is a snapshot taken when the Review tab is first built (app start), and "Review again" replays that snapshot. Newly added or saved cards reach Review only through Study or Drill, or after a restart (Task 4 makes the queue live).
+- Settings (read-aloud, reminder time) live only for the current session and are not persisted. Review logs and quiz history are not wired to storage yet (later Phase 3 tasks). The quiz still asks sample questions and the Stats streak is placeholder history.
 - Card editing, draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
 - The Review screen's read-aloud toggle (TTS ON/OFF) is saved for the session but does not speak yet; no text-to-speech package is added.
 
