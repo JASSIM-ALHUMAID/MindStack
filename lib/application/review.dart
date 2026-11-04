@@ -56,8 +56,13 @@ class ReviewState {
 /// The review session. The queue is a point-in-time snapshot of card ids;
 /// each card is read live through [currentReviewCardProvider].
 class ReviewNotifier extends AsyncNotifier<ReviewState> {
+  /// Bumped whenever the queue is replaced or restarted, so an in-flight
+  /// [rate] can tell its session is gone.
+  int _session = 0;
+
   @override
   Future<ReviewState> build() async {
+    _session++;
     final due = await ref
         .read(cardRepositoryProvider)
         .due(now: ref.read(clockProvider).now());
@@ -74,14 +79,22 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   /// the write fails.
   Future<void> rate(Rating rating) async {
     final current = state.value;
-    if (current == null || current.saving || current.finished) return;
+    if (state.isLoading || current == null || current.saving) return;
+    if (current.finished) return;
+    final session = _session;
     state = AsyncData(current.copyWith(saving: true));
     try {
       await ref.read(cardCommandsProvider).rateCard(current.currentId!, rating);
-    } on AppFailure {
-      state = AsyncData(current.copyWith(saving: false));
+    } catch (_) {
+      // Any failure, not only AppFailure, must release the saving flag.
+      if (session == _session) {
+        state = AsyncData(current.copyWith(saving: false));
+      }
       rethrow;
     }
+    // A restart or a new queue replaced this session while the write ran;
+    // the rating is stored but must not touch the new queue.
+    if (session != _session) return;
     state = AsyncData(current.copyWith(index: current.index + 1));
   }
 
@@ -89,6 +102,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   void restart() {
     final current = state.value;
     if (current == null) return;
+    _session++;
     state = AsyncData(current.copyWith(index: 0, saving: false));
   }
 
@@ -115,6 +129,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     Future<List<Flashcard>> Function() load,
     List<Flashcard> Function(List<Flashcard>) select,
   ) async {
+    _session++;
     state = const AsyncLoading<ReviewState>().copyWithPrevious(state);
     state = await AsyncValue.guard(() async {
       final cards = select(await load());

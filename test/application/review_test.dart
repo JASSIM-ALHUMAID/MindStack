@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mindstack/application/cards.dart';
@@ -5,9 +7,11 @@ import 'package:mindstack/application/core_providers.dart';
 import 'package:mindstack/application/inbox.dart';
 import 'package:mindstack/application/library.dart';
 import 'package:mindstack/application/review.dart';
+import 'package:mindstack/data/drift_transaction_runner.dart';
 import 'package:mindstack/domain/enums.dart';
 import 'package:mindstack/domain/failures.dart';
 import 'package:mindstack/domain/models/flashcard.dart';
+import 'package:mindstack/domain/repositories.dart';
 
 import '../support/container.dart';
 import '../support/fakes.dart';
@@ -39,6 +43,20 @@ Future<String> _card(
     await repo.update(card.copyWith(dueAt: dueAt, mastery: mastery));
   }
   return id;
+}
+
+/// Runs actions through [_inner] only after [gate] completes.
+final class _GatedRunner implements TransactionRunner {
+  _GatedRunner(this._inner, {this.gate});
+
+  final TransactionRunner _inner;
+  final Future<void>? gate;
+
+  @override
+  Future<T> run<T>(Future<T> Function() action) async {
+    await gate;
+    return _inner.run(action);
+  }
 }
 
 void main() {
@@ -208,4 +226,79 @@ void main() {
 
     expect(sub.read(), const AsyncData<Flashcard?>(null));
   });
+
+  test('a stale rating does not clobber a newly started queue', () async {
+    final gate = Completer<void>();
+    final c = makeContainer(
+      clock: FixedClock(_now),
+      overrides: [
+        transactionRunnerProvider.overrideWith(
+          (ref) => _GatedRunner(
+            DriftTransactionRunner(ref.watch(databaseProvider)),
+            gate: gate.future,
+          ),
+        ),
+      ],
+    );
+    final a = await _deck(c, 'A');
+    final b = await _deck(c, 'B');
+    await _card(c, a, question: 'a');
+    final inB = await _card(c, b, question: 'b1');
+    await _card(c, b, question: 'b2');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+
+    final pending = notifier.rate(Rating.good);
+    await notifier.startDeck(b);
+    gate.complete();
+    await pending;
+
+    final state = c.read(reviewProvider).requireValue;
+    expect(state.index, 0);
+    expect(state.saving, isFalse);
+    expect(state.cardIds, hasLength(2));
+    expect(state.cardIds, contains(inB));
+  });
+
+  test(
+    'a non-AppFailure error releases saving and a later rate works',
+    () async {
+      var fail = true;
+      final c = makeContainer(
+        clock: FixedClock(_now),
+        overrides: [
+          transactionRunnerProvider.overrideWith((ref) {
+            final real = DriftTransactionRunner(ref.watch(databaseProvider));
+            return _SwitchRunner(real, () => fail);
+          }),
+        ],
+      );
+      final deck = await _deck(c);
+      final id = await _card(c, deck, question: 'q');
+      await c.read(reviewProvider.future);
+      final notifier = c.read(reviewProvider.notifier);
+
+      await expectLater(notifier.rate(Rating.good), throwsStateError);
+      expect(c.read(reviewProvider).requireValue.saving, isFalse);
+      expect(c.read(reviewProvider).requireValue.index, 0);
+
+      fail = false;
+      await notifier.rate(Rating.good);
+      expect(c.read(reviewProvider).requireValue.index, 1);
+      expect((await c.read(cardRepositoryProvider).byId(id)).repetitions, 1);
+    },
+  );
+}
+
+final class _SwitchRunner implements TransactionRunner {
+  _SwitchRunner(this._inner, this._shouldFail);
+
+  final TransactionRunner _inner;
+  final bool Function() _shouldFail;
+
+  @override
+  Future<T> run<T>(Future<T> Function() action) {
+    if (_shouldFail()) throw StateError('boom');
+    return _inner.run(action);
+  }
 }
