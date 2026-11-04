@@ -71,7 +71,7 @@ class _AsyncValueViewState<T> extends ConsumerState<AsyncValueView<T>> {
       data: widget.data,
       error: (error, _) => Padding(
         padding: const EdgeInsets.all(16),
-        child: SoftCard(child: Text(failureMessage(error))),
+        child: SoftCard(child: Text(loadFailureMessage(error))),
       ),
       loading: () =>
           widget.loading ?? const Center(child: CircularProgressIndicator()),

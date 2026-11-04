@@ -98,9 +98,19 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           AsyncValueView<Flashcard?>(
             value: ref.watch(currentReviewCardProvider),
             data: (card) => card == null
-                ? const SoftCard(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: Text('This card no longer exists.')),
+                ? SoftCard(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        const Text('This card no longer exists.'),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () =>
+                              ref.read(reviewProvider.notifier).skip(),
+                          child: const Text('Skip'),
+                        ),
+                      ],
+                    ),
                   )
                 : _CardView(
                     card: card,
@@ -140,7 +150,7 @@ class _CardView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final decks = ref.watch(decksProvider).value;
+    final decks = ref.watch(decksProvider).valueOrNull;
     final deck = decks?.where((d) => d.id == card.deckId).firstOrNull;
     // Blank while the decks load; "Unknown" only once they say it is missing.
     final deckTitle = deck?.title ?? (decks == null ? '' : 'Unknown');

@@ -116,6 +116,21 @@ void main() {
     expect(stored.repetitions, 1);
   });
 
+  test('skip advances past a deleted card', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final gone = await _card(c, deck, question: 'gone');
+    await _card(c, deck, question: 'kept');
+    await c.read(reviewProvider.future);
+    await c.read(cardCommandsProvider).deleteCard(gone);
+
+    c.read(reviewProvider.notifier).skip();
+
+    final state = c.read(reviewProvider).requireValue;
+    expect(state.index, 1);
+    expect(state.saving, isFalse);
+  });
+
   test('rate does nothing once the session is finished', () async {
     final c = makeContainer(clock: FixedClock(_now));
     await c.read(reviewProvider.future);

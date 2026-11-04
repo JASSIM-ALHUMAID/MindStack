@@ -53,7 +53,7 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
   }
 
   Future<void> _chooseDeck() async {
-    final decks = ref.read(decksProvider).value ?? const <Deck>[];
+    final decks = ref.read(decksProvider).valueOrNull ?? const <Deck>[];
     final deckId = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.card,

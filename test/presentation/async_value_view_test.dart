@@ -38,7 +38,7 @@ void main() {
     await pumpInApp(tester, container, view(value));
     await tester.pump();
 
-    expect(find.text("Couldn't save. Please try again."), findsOneWidget);
+    expect(find.text("Couldn't load this. Please try again."), findsOneWidget);
     expect(find.textContaining('secret detail'), findsNothing);
     expect(logger.errors, hasLength(1));
 

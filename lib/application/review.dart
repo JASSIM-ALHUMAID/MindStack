@@ -98,6 +98,16 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     state = AsyncData(current.copyWith(index: current.index + 1));
   }
 
+  /// Moves past the current card without rating it, for a card that was
+  /// deleted since the queue was built. Does nothing while loading, saving or
+  /// finished.
+  void skip() {
+    final current = state.value;
+    if (state.isLoading || current == null || current.saving) return;
+    if (current.finished) return;
+    state = AsyncData(current.copyWith(index: current.index + 1));
+  }
+
   /// "Review again": returns to the first card of the same queue.
   void restart() {
     final current = state.value;

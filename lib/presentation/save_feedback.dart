@@ -43,3 +43,15 @@ Future<bool> runSave(
   }
   return true;
 }
+
+/// Shown when reading data fails with a storage or unknown error.
+const String kGenericLoadFailureMessage =
+    "Couldn't load this. Please try again.";
+
+/// The text a user may see when a read of [error] failed. Like
+/// [failureMessage] but with load wording for storage and unknown errors.
+String loadFailureMessage(Object error) => switch (error) {
+  StorageFailure() => kGenericLoadFailureMessage,
+  AppFailure() => error.userMessage,
+  _ => kGenericLoadFailureMessage,
+};

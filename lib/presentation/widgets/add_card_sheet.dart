@@ -68,7 +68,10 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
   Widget build(BuildContext context) {
     // The number is cosmetic, so it is left blank rather than blocking the
     // form while the count loads or if it fails.
-    final count = ref.watch(deckCardsProvider(widget.deckId)).value?.length;
+    final count = ref
+        .watch(deckCardsProvider(widget.deckId))
+        .valueOrNull
+        ?.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,

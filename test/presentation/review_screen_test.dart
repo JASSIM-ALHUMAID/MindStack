@@ -116,4 +116,46 @@ void main() {
     );
     expect(good.onTap, isNotNull, reason: 'rating can be retried');
   });
+
+  testWidgets('a deleted front card offers Skip, which advances', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final container = makeContainer();
+    await container.read(appStartupProvider.future);
+    final db = container.read(databaseProvider);
+    await db.delete(db.flashcards).go();
+    final library = container.read(libraryCommandsProvider);
+    final course = await library.createCourse(
+      title: 'Course',
+      examDate: DateTime(2026, 12, 1),
+    );
+    final deckId = await library.createDeck(courseId: course, title: 'Deck');
+    final cards = container.read(cardCommandsProvider);
+    final gone = await cards.addCard(
+      deckId: deckId,
+      question: 'Gone question',
+      answer: 'A',
+    );
+    await cards.addCard(deckId: deckId, question: 'Next question', answer: 'A');
+
+    await pumpInApp(tester, container, const ReviewScreen());
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+    await cards.deleteCard(gone);
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+
+    expect(find.text('This card no longer exists.'), findsOneWidget);
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Next question'), findsOneWidget);
+    expect(find.text('This card no longer exists.'), findsNothing);
+  });
 }

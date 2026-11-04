@@ -26,7 +26,7 @@ class DeckEditorScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final deck = ref.watch(deckProvider(deckId));
-    final loaded = deck.value;
+    final loaded = deck.valueOrNull;
     if (loaded != null) return _DeckEditor(deck: loaded);
     // Loading, failed, or the deck does not exist (any more), for example
     // because it was deleted or merged while this screen was open.
@@ -59,16 +59,35 @@ class DeckEditorScreen extends ConsumerWidget {
   }
 }
 
-class _DeckEditor extends ConsumerWidget {
+class _DeckEditor extends ConsumerStatefulWidget {
   final Deck deck;
 
   const _DeckEditor({required this.deck});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DeckEditor> createState() => _DeckEditorState();
+}
+
+class _DeckEditorState extends ConsumerState<_DeckEditor> {
+  /// True while a merge flow is running, so a second one cannot start.
+  bool _merging = false;
+
+  Future<void> _merge() async {
+    if (_merging) return;
+    setState(() => _merging = true);
+    try {
+      await _mergeDeck(context, ref, widget.deck);
+    } finally {
+      if (mounted) setState(() => _merging = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final deck = widget.deck;
     final deckId = deck.id;
     final cardsValue = ref.watch(deckCardsProvider(deckId));
-    final cards = cardsValue.value ?? const <Flashcard>[];
+    final cards = cardsValue.valueOrNull ?? const <Flashcard>[];
     final now = ref.read(clockProvider).now();
     final reviewable = cards.where((c) => !c.dueAt.isAfter(now)).length;
     final newCount = cards.where((c) => c.isNew).length;
@@ -105,7 +124,7 @@ class _DeckEditor extends ConsumerWidget {
                 case _DeckAction.merge:
                   // The menu callback is synchronous; the merge flow reports
                   // its own outcome through the sheet and snackbars.
-                  unawaited(_mergeDeck(context, ref, deck));
+                  unawaited(_merge());
                 case _DeckAction.share:
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -114,15 +133,16 @@ class _DeckEditor extends ConsumerWidget {
                   );
               }
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: _DeckAction.merge,
-                child: ListTile(
+                enabled: !_merging,
+                child: const ListTile(
                   leading: Icon(LucideIcons.merge),
                   title: Text('Merge into another deck'),
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: _DeckAction.share,
                 child: ListTile(
                   leading: Icon(LucideIcons.share),
@@ -192,7 +212,7 @@ enum _DeckAction { merge, share }
 /// then move the cards, remove this deck and return to Library.
 Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
   final others = [
-    for (final d in ref.read(decksProvider).value ?? const <Deck>[])
+    for (final d in ref.read(decksProvider).valueOrNull ?? const <Deck>[])
       if (d.id != deck.id) d,
   ];
   final target = await showModalBottomSheet<Deck>(
@@ -235,7 +255,7 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
   );
   if (target == null || !context.mounted) return;
 
-  final count = ref.read(deckCardsProvider(deck.id)).value?.length ?? 0;
+  final count = ref.read(deckCardsProvider(deck.id)).valueOrNull?.length ?? 0;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -266,7 +286,7 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
     context,
     ref,
     () => commands.mergeDecks(fromId: deck.id, toId: target.id),
-    success: 'Merged ${deck.title} into ${target.title}',
+    success: 'Merged "${deck.title}" into "${target.title}"',
   );
   if (saved) router.pop();
 }
