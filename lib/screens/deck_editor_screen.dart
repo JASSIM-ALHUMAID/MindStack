@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,7 +55,9 @@ class DeckEditorScreen extends ConsumerWidget {
             onSelected: (action) {
               switch (action) {
                 case _DeckAction.merge:
-                  _mergeDeck(context, ref, deck);
+                  // The menu callback is synchronous; the merge flow reports
+                  // its own outcome through the sheet and snackbars.
+                  unawaited(_mergeDeck(context, ref, deck));
                   break;
                 case _DeckAction.share:
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -86,7 +90,7 @@ class DeckEditorScreen extends ConsumerWidget {
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: cards.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, i) => _CardTile(number: i + 1, card: cards[i]),
             ),
       bottomNavigationBar: SafeArea(

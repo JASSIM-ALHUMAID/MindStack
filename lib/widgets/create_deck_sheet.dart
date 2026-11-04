@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -46,7 +48,8 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
     // Close the sheet, then open the new deck so cards can be added right away.
     final router = GoRouter.of(context);
     Navigator.pop(context);
-    router.push(RouteNames.deckPath(id));
+    // Fire-and-forget: this sheet is closed, so nothing waits on the pop result.
+    unawaited(router.push<void>(RouteNames.deckPath(id)));
   }
 
   @override

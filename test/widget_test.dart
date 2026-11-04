@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
-import 'package:mindstack/app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mindstack/app.dart';
 
 void main() {
   testWidgets('app opens on the Library tab and can switch tabs', (tester) async {

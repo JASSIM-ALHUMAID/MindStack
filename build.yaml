@@ -1,0 +1,10 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        enabled: true
+        options:
+          store_date_time_values_as_text: true
+        generate_for:
+          include:
+            - lib/data/database/app_database.dart
