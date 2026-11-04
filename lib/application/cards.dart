@@ -5,6 +5,7 @@ import '../domain/failures.dart';
 import '../domain/models/deck_stats.dart';
 import '../domain/models/flashcard.dart';
 import '../domain/models/review_log.dart';
+import '../domain/models/review_result.dart';
 import '../domain/scheduler.dart';
 import 'core_providers.dart';
 import 'services.dart';
@@ -91,6 +92,14 @@ final class CardCommands {
     String id,
     Rating rating, {
     int elapsedMs = 0,
+  }) async => (await recordRating(id, rating, elapsedMs: elapsedMs)).card;
+
+  /// Same atomic write as [rateCard], returning the exact committed log and
+  /// rated card so a session can summarize only its own successful reviews.
+  Future<ReviewResult> recordRating(
+    String id,
+    Rating rating, {
+    int elapsedMs = 0,
   }) async {
     if (elapsedMs < 0) {
       throw const InvalidInput(
@@ -102,22 +111,17 @@ final class CardCommands {
       final cards = _ref.read(cardRepositoryProvider);
       final card = await cards.byId(id);
       final now = _ref.read(clockProvider).now();
-      final rated = Sm2Scheduler.apply(
-        card,
-        rating,
-        now: now,
-      );
+      final rated = Sm2Scheduler.apply(card, rating, now: now);
       await cards.update(rated);
-      await _ref.read(reviewLogRepositoryProvider).insert(
-        ReviewLog(
-          id: _ref.read(idGeneratorProvider).newId(),
-          cardId: id,
-          reviewedAt: now,
-          rating: rating,
-          elapsedMs: elapsedMs,
-        ),
+      final log = ReviewLog(
+        id: _ref.read(idGeneratorProvider).newId(),
+        cardId: id,
+        reviewedAt: now,
+        rating: rating,
+        elapsedMs: elapsedMs,
       );
-      return rated;
+      await _ref.read(reviewLogRepositoryProvider).insert(log);
+      return ReviewResult(card: rated, log: log);
     });
   }
 }

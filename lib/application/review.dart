@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/enums.dart';
 import '../domain/failures.dart';
 import '../domain/models/flashcard.dart';
+import '../domain/models/review_result.dart';
 import 'cards.dart';
 import 'core_providers.dart';
 import 'services.dart';
@@ -17,6 +18,8 @@ class ReviewState {
     required this.cardIds,
     this.index = 0,
     this.saving = false,
+    this.results = const [],
+    this.sessionId = 0,
   });
 
   /// Ids of the cards in this session, in review order.
@@ -28,6 +31,30 @@ class ReviewState {
   /// Whether a rating is being written.
   final bool saving;
 
+  /// Successful, committed ratings from this session only. Skipped cards
+  /// and failed saves do not add a result.
+  final List<ReviewResult> results;
+
+  /// Distinguishes a new session from a previous one showing the same card.
+  final int sessionId;
+
+  int get reviewedCount => results.length;
+
+  /// Sum of the per-card times stored in this session's review logs.
+  int get elapsedMs =>
+      results.fold(0, (total, result) => total + result.log.elapsedMs);
+
+  double get secondsPerCard =>
+      reviewedCount == 0 ? 0 : elapsedMs / 1000 / reviewedCount;
+
+  /// Earliest due date assigned by this session's successful ratings.
+  DateTime? get nextDue {
+    if (results.isEmpty) return null;
+    return results
+        .map((result) => result.card.dueAt)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+  }
+
   /// Whether every card in the queue has been rated.
   bool get finished => index >= cardIds.length;
 
@@ -35,11 +62,19 @@ class ReviewState {
   String? get currentId => finished ? null : cardIds[index];
 
   /// A copy with the given fields replaced.
-  ReviewState copyWith({List<String>? cardIds, int? index, bool? saving}) {
+  ReviewState copyWith({
+    List<String>? cardIds,
+    int? index,
+    bool? saving,
+    List<ReviewResult>? results,
+    int? sessionId,
+  }) {
     return ReviewState(
       cardIds: cardIds ?? this.cardIds,
       index: index ?? this.index,
       saving: saving ?? this.saving,
+      results: results ?? this.results,
+      sessionId: sessionId ?? this.sessionId,
     );
   }
 
@@ -48,10 +83,18 @@ class ReviewState {
       other is ReviewState &&
       other.index == index &&
       other.saving == saving &&
+      other.sessionId == sessionId &&
+      listEquals(other.results, results) &&
       listEquals(other.cardIds, cardIds);
 
   @override
-  int get hashCode => Object.hash(index, saving, Object.hashAll(cardIds));
+  int get hashCode => Object.hash(
+    index,
+    saving,
+    sessionId,
+    Object.hashAll(cardIds),
+    Object.hashAll(results),
+  );
 }
 
 /// The review session. The queue is a point-in-time snapshot of card ids;
@@ -67,13 +110,16 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   @override
   Future<ReviewState> build() async {
     _building = true;
-    _session++;
+    final session = ++_session;
     try {
       final due = await ref
           .read(cardRepositoryProvider)
           .due(now: ref.read(clockProvider).now());
       _cardStartedAt = ref.read(clockProvider).now();
-      return ReviewState(cardIds: [for (final c in due) c.id]);
+      return ReviewState(
+        cardIds: [for (final c in due) c.id],
+        sessionId: session,
+      );
     } finally {
       _building = false;
     }
@@ -95,10 +141,11 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     final now = ref.read(clockProvider).now();
     final elapsedMs = now.difference(_cardStartedAt ?? now).inMilliseconds;
     state = AsyncData(current.copyWith(saving: true));
+    late final ReviewResult result;
     try {
-      await ref
+      result = await ref
           .read(cardCommandsProvider)
-          .rateCard(
+          .recordRating(
             current.currentId!,
             rating,
             elapsedMs: elapsedMs < 0 ? 0 : elapsedMs,
@@ -114,7 +161,12 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     // the rating is stored but must not touch the new queue.
     if (session != _session) return;
     _cardStartedAt = ref.read(clockProvider).now();
-    state = AsyncData(current.copyWith(index: current.index + 1));
+    state = AsyncData(
+      current.copyWith(
+        index: current.index + 1,
+        results: List<ReviewResult>.unmodifiable([...current.results, result]),
+      ),
+    );
   }
 
   /// Moves past the current card without rating it, for a card that was
@@ -132,9 +184,16 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   void restart() {
     final current = state.valueOrNull;
     if (current == null) return;
-    _session++;
+    final session = ++_session;
     _cardStartedAt = ref.read(clockProvider).now();
-    state = AsyncData(current.copyWith(index: 0, saving: false));
+    state = AsyncData(
+      current.copyWith(
+        index: 0,
+        saving: false,
+        results: const [],
+        sessionId: session,
+      ),
+    );
   }
 
   /// Loads a fresh session. By default only cards due now are included,
@@ -192,7 +251,10 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     state = const AsyncLoading<ReviewState>().copyWithPrevious(state);
     final result = await AsyncValue.guard(() async {
       final cards = select(await load());
-      return ReviewState(cardIds: [for (final c in cards) c.id]);
+      return ReviewState(
+        cardIds: [for (final c in cards) c.id],
+        sessionId: session,
+      );
     });
     // A newer start, restart or rebuild replaced this one while it loaded;
     // its queue (or failure) must not overwrite the newer session.
