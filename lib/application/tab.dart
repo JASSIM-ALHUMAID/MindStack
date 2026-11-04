@@ -11,5 +11,6 @@ class TabIndexNotifier extends Notifier<int> {
   void set(int index) => state = index;
 }
 
-final tabIndexProvider =
-    NotifierProvider<TabIndexNotifier, int>(TabIndexNotifier.new);
+final tabIndexProvider = NotifierProvider<TabIndexNotifier, int>(
+  TabIndexNotifier.new,
+);

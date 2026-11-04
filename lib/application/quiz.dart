@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/sample_data.dart';
 import '../domain/models/quiz_question.dart';
+import 'core_providers.dart';
 
 class QuizState {
   final List<QuizQuestion> questions;
@@ -28,7 +28,7 @@ class QuizState {
 
 class QuizNotifier extends Notifier<QuizState> {
   @override
-  QuizState build() => const QuizState(questions: sampleQuiz);
+  QuizState build() => QuizState(questions: ref.read(sampleQuizProvider));
 
   void select(int option) {
     final q = state.current;
@@ -52,7 +52,9 @@ class QuizNotifier extends Notifier<QuizState> {
     );
   }
 
-  void restart() => state = const QuizState(questions: sampleQuiz);
+  void restart() => state = QuizState(questions: ref.read(sampleQuizProvider));
 }
 
-final quizProvider = NotifierProvider<QuizNotifier, QuizState>(QuizNotifier.new);
+final quizProvider = NotifierProvider<QuizNotifier, QuizState>(
+  QuizNotifier.new,
+);

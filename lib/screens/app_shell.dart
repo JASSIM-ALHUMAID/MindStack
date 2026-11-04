@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../providers/tab_provider.dart';
+import '../application/tab.dart';
 import 'inbox_screen.dart';
 import 'library_screen.dart';
 import 'quiz_screen.dart';
@@ -36,13 +36,29 @@ class AppShell extends ConsumerWidget {
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
-          onDestinationSelected: (i) => ref.read(tabIndexProvider.notifier).set(i),
+          onDestinationSelected: (i) =>
+              ref.read(tabIndexProvider.notifier).set(i),
           destinations: const [
-            NavigationDestination(icon: Icon(LucideIcons.inbox), label: 'INBOX'),
-            NavigationDestination(icon: Icon(LucideIcons.book), label: 'LIBRARY'),
-            NavigationDestination(icon: Icon(LucideIcons.bookOpen), label: 'REVIEW'),
-            NavigationDestination(icon: Icon(LucideIcons.circleQuestionMark), label: 'QUIZ'),
-            NavigationDestination(icon: Icon(LucideIcons.chartNoAxesColumn), label: 'STATS'),
+            NavigationDestination(
+              icon: Icon(LucideIcons.inbox),
+              label: 'INBOX',
+            ),
+            NavigationDestination(
+              icon: Icon(LucideIcons.book),
+              label: 'LIBRARY',
+            ),
+            NavigationDestination(
+              icon: Icon(LucideIcons.bookOpen),
+              label: 'REVIEW',
+            ),
+            NavigationDestination(
+              icon: Icon(LucideIcons.circleQuestionMark),
+              label: 'QUIZ',
+            ),
+            NavigationDestination(
+              icon: Icon(LucideIcons.chartNoAxesColumn),
+              label: 'STATS',
+            ),
           ],
         ),
       ),

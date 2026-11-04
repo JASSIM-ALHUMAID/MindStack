@@ -5,11 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../application/tab.dart';
 import '../domain/models/deck.dart';
 import '../domain/models/flashcard.dart';
 import '../providers/library_provider.dart';
 import '../providers/review_provider.dart';
-import '../providers/tab_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/add_card_sheet.dart';
 import '../widgets/common.dart';
@@ -21,11 +21,16 @@ class DeckEditorScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deck = ref.watch(decksProvider).where((d) => d.id == deckId).firstOrNull;
+    final deck = ref
+        .watch(decksProvider)
+        .where((d) => d.id == deckId)
+        .firstOrNull;
     // The deck can disappear while this screen closes after a merge.
     if (deck == null) return const Scaffold();
     final cards = ref.watch(deckCardsProvider(deckId));
-    final reviewable = cards.where((c) => !c.dueAt.isAfter(DateTime.now())).length;
+    final reviewable = cards
+        .where((c) => !c.dueAt.isAfter(DateTime.now()))
+        .length;
     final newCount = cards.where((c) => c.isNew).length;
 
     return Scaffold(
@@ -39,7 +44,10 @@ class DeckEditorScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${cards.length} ${cards.length == 1 ? 'CARD' : 'CARDS'}', style: kMonoLabel),
+            Text(
+              '${cards.length} ${cards.length == 1 ? 'CARD' : 'CARDS'}',
+              style: kMonoLabel,
+            ),
             Text(deck.title, style: kSerifTitle.copyWith(fontSize: 22)),
           ],
         ),
@@ -61,7 +69,9 @@ class DeckEditorScreen extends ConsumerWidget {
                   break;
                 case _DeckAction.share:
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Deck sharing arrives in Phase 3')),
+                    const SnackBar(
+                      content: Text('Deck sharing arrives in Phase 3'),
+                    ),
                   );
                   break;
               }
@@ -91,7 +101,8 @@ class DeckEditorScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               itemCount: cards.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, i) => _CardTile(number: i + 1, card: cards[i]),
+              itemBuilder: (context, i) =>
+                  _CardTile(number: i + 1, card: cards[i]),
             ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -243,20 +254,25 @@ class _CardTile extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              Text('MASTERY: ${(card.mastery * 100).round()}%', style: kMonoLabel),
+              Text(
+                'MASTERY: ${(card.mastery * 100).round()}%',
+                style: kMonoLabel,
+              ),
               const Spacer(),
               TextButton(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Card editing arrives in Phase 3')),
+                  const SnackBar(
+                    content: Text('Card editing arrives in Phase 3'),
+                  ),
                 ),
                 child: const Text('Edit'),
               ),
               TextButton(
                 onPressed: () {
                   ref.read(cardsProvider.notifier).remove(card.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Card deleted')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Card deleted')));
                 },
                 style: TextButton.styleFrom(foregroundColor: AppColors.danger),
                 child: const Text('Delete'),

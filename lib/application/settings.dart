@@ -24,5 +24,6 @@ class SettingsNotifier extends Notifier<SettingsState> {
   void toggleTts() => state = state.copyWith(ttsEnabled: !state.ttsEnabled);
 }
 
-final settingsProvider =
-    NotifierProvider<SettingsNotifier, SettingsState>(SettingsNotifier.new);
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
+  SettingsNotifier.new,
+);

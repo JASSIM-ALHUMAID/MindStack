@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../application/settings.dart';
 import '../domain/enums.dart';
 import '../domain/models/flashcard.dart';
 import '../domain/scheduler.dart';
 import '../providers/library_provider.dart';
 import '../providers/review_provider.dart';
-import '../providers/settings_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
@@ -46,8 +46,14 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           title: 'Review',
           trailing: TextButton.icon(
             onPressed: () => ref.read(settingsProvider.notifier).toggleTts(),
-            icon: Icon(settings.ttsEnabled ? LucideIcons.volume2 : LucideIcons.volumeX, size: 18),
-            label: Text(settings.ttsEnabled ? 'TTS ON' : 'TTS OFF', style: kMonoLabel),
+            icon: Icon(
+              settings.ttsEnabled ? LucideIcons.volume2 : LucideIcons.volumeX,
+              size: 18,
+            ),
+            label: Text(
+              settings.ttsEnabled ? 'TTS ON' : 'TTS OFF',
+              style: kMonoLabel,
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -105,8 +111,13 @@ class _CardView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deck = ref.watch(decksProvider).where((d) => d.id == card.deckId).firstOrNull;
-    final interval = card.isNew ? 'NEW' : '${card.intervalDays} DAY${card.intervalDays == 1 ? '' : 'S'}';
+    final deck = ref
+        .watch(decksProvider)
+        .where((d) => d.id == card.deckId)
+        .firstOrNull;
+    final interval = card.isNew
+        ? 'NEW'
+        : '${card.intervalDays} DAY${card.intervalDays == 1 ? '' : 'S'}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,25 +150,40 @@ class _CardView extends ConsumerWidget {
                 children: [
                   Text(showAnswer ? 'ANSWER' : 'QUESTION', style: kMonoLabel),
                   const SizedBox(height: 12),
-                  Text(card.question, style: kSerifTitle.copyWith(fontSize: 24)),
+                  Text(
+                    card.question,
+                    style: kSerifTitle.copyWith(fontSize: 24),
+                  ),
                   if (showAnswer) ...[
                     const SizedBox(height: 12),
-                    Text(card.answer, style: const TextStyle(fontSize: 16, height: 1.5)),
+                    Text(
+                      card.answer,
+                      style: const TextStyle(fontSize: 16, height: 1.5),
+                    ),
                     if (card.sourceRef != null) ...[
                       const SizedBox(height: 16),
                       const Divider(height: 1),
                       const SizedBox(height: 8),
-                      Text('REF: ${card.sourceRef!.toUpperCase()}', style: kMonoMicro),
+                      Text(
+                        'REF: ${card.sourceRef!.toUpperCase()}',
+                        style: kMonoMicro,
+                      ),
                     ],
                   ],
                   const SizedBox(height: 24),
                   Center(
                     child: Column(
                       children: [
-                        const Icon(LucideIcons.refreshCw, size: 18, color: AppColors.primary),
+                        const Icon(
+                          LucideIcons.refreshCw,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          showAnswer ? 'TAP CARD TO HIDE ANSWER' : 'TAP TO REVEAL ANSWER',
+                          showAnswer
+                              ? 'TAP CARD TO HIDE ANSWER'
+                              : 'TAP TO REVEAL ANSWER',
                           style: kMonoLabel,
                         ),
                       ],
@@ -200,12 +226,18 @@ class _RatingButton extends StatelessWidget {
   final Flashcard card;
   final VoidCallback onTap;
 
-  const _RatingButton({required this.rating, required this.card, required this.onTap});
+  const _RatingButton({
+    required this.rating,
+    required this.card,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final next = formatInterval(Sm2Scheduler.apply(card, rating, now: now).dueAt.difference(now));
+    final next = formatInterval(
+      Sm2Scheduler.apply(card, rating, now: now).dueAt.difference(now),
+    );
     final color = switch (rating) {
       Rating.again => AppColors.danger,
       Rating.hard => AppColors.hard,
@@ -227,8 +259,17 @@ class _RatingButton extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: TextStyle(color: filled ? Colors.white : color, fontSize: 14)),
-            Text(next, style: kMonoMicro.copyWith(color: filled ? Colors.white : color)),
+            Text(
+              label,
+              style: TextStyle(
+                color: filled ? Colors.white : color,
+                fontSize: 14,
+              ),
+            ),
+            Text(
+              next,
+              style: kMonoMicro.copyWith(color: filled ? Colors.white : color),
+            ),
           ],
         ),
       ),
@@ -246,7 +287,10 @@ class _SessionComplete extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ids = {for (final c in queue) c.id};
     // Look up the updated cards so intervals and due dates are after rating.
-    final reviewed = ref.watch(cardsProvider).where((c) => ids.contains(c.id)).toList();
+    final reviewed = ref
+        .watch(cardsProvider)
+        .where((c) => ids.contains(c.id))
+        .toList();
     final decks = ref.watch(decksProvider);
     final nextDue = reviewed.isEmpty
         ? null
@@ -265,17 +309,29 @@ class _SessionComplete extends ConsumerWidget {
                   color: AppColors.chip,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(LucideIcons.circleCheck, color: AppColors.primary),
+                child: const Icon(
+                  LucideIcons.circleCheck,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(height: 12),
-              Text('Session complete', style: kSerifTitle.copyWith(fontSize: 24)),
+              Text(
+                'Session complete',
+                style: kSerifTitle.copyWith(fontSize: 24),
+              ),
               const SizedBox(height: 8),
-              const Text('Nice work.', style: TextStyle(color: AppColors.muted)),
+              const Text(
+                'Nice work.',
+                style: TextStyle(color: AppColors.muted),
+              ),
               const SizedBox(height: 12),
               PillLabel('${queue.length} cards reviewed'),
               if (nextDue != null) ...[
                 const SizedBox(height: 16),
-                Text('NEXT DUE: ${formatDueDay(nextDue).toUpperCase()}', style: kMonoLabel),
+                Text(
+                  'NEXT DUE: ${formatDueDay(nextDue).toUpperCase()}',
+                  style: kMonoLabel,
+                ),
               ],
               const SizedBox(height: 20),
               SizedBox(

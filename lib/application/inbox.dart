@@ -10,6 +10,9 @@ final draftsProvider = StreamProvider<List<DraftCard>>(
   (ref) => ref.watch(draftRepositoryProvider).watchAll(),
 );
 
+/// OCR progress from 0 to 1 while a scan runs, or null when none is running.
+final ocrProgressProvider = StateProvider<double?>((ref) => null);
+
 /// Writes to the draft inbox.
 final inboxCommandsProvider = Provider<InboxCommands>(InboxCommands.new);
 

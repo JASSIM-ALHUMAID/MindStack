@@ -1,0 +1,211 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mindstack/application/cards.dart';
+import 'package:mindstack/application/core_providers.dart';
+import 'package:mindstack/application/inbox.dart';
+import 'package:mindstack/application/library.dart';
+import 'package:mindstack/application/review.dart';
+import 'package:mindstack/domain/enums.dart';
+import 'package:mindstack/domain/failures.dart';
+import 'package:mindstack/domain/models/flashcard.dart';
+
+import '../support/container.dart';
+import '../support/fakes.dart';
+
+final _now = DateTime(2026, 11, 4, 12);
+
+Future<String> _deck(ProviderContainer c, [String title = 'Deck']) async {
+  final library = c.read(libraryCommandsProvider);
+  final course = await library.createCourse(
+    title: 'Course $title',
+    examDate: DateTime(2026, 12, 1),
+  );
+  return library.createDeck(courseId: course, title: title);
+}
+
+Future<String> _card(
+  ProviderContainer c,
+  String deck, {
+  required String question,
+  DateTime? dueAt,
+  double mastery = 0,
+}) async {
+  final id = await c
+      .read(cardCommandsProvider)
+      .addCard(deckId: deck, question: question, answer: 'A');
+  if (dueAt != null || mastery != 0) {
+    final repo = c.read(cardRepositoryProvider);
+    final card = await repo.byId(id);
+    await repo.update(card.copyWith(dueAt: dueAt, mastery: mastery));
+  }
+  return id;
+}
+
+void main() {
+  test('inbox ocrProgressProvider defaults to null', () {
+    final c = makeContainer();
+    expect(c.read(ocrProgressProvider), isNull);
+  });
+
+  test('queue contains only due cards', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final due = await _card(c, deck, question: 'due');
+    await _card(
+      c,
+      deck,
+      question: 'later',
+      dueAt: _now.add(const Duration(days: 3)),
+    );
+
+    final state = await c.read(reviewProvider.future);
+
+    expect(state.cardIds, [due]);
+    expect(state.index, 0);
+    expect(state.saving, isFalse);
+  });
+
+  test('rate advances and persists', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final id = await _card(c, deck, question: 'q');
+    await c.read(reviewProvider.future);
+
+    await c.read(reviewProvider.notifier).rate(Rating.good);
+
+    final state = c.read(reviewProvider).requireValue;
+    expect(state.index, 1);
+    expect(state.finished, isTrue);
+    expect(state.saving, isFalse);
+    final stored = await c.read(cardRepositoryProvider).byId(id);
+    expect(stored.repetitions, 1);
+  });
+
+  test('rating twice quickly rates the card once', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final first = await _card(c, deck, question: 'one');
+    await _card(c, deck, question: 'two');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+
+    final a = notifier.rate(Rating.good);
+    final b = notifier.rate(Rating.good);
+    await Future.wait([a, b]);
+
+    expect(c.read(reviewProvider).requireValue.index, 1);
+    final stored = await c.read(cardRepositoryProvider).byId(first);
+    expect(stored.repetitions, 1);
+  });
+
+  test('rate does nothing once the session is finished', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    await c.read(reviewProvider.future);
+
+    await c.read(reviewProvider.notifier).rate(Rating.good);
+
+    expect(c.read(reviewProvider).requireValue.index, 0);
+  });
+
+  test('failed rate keeps the index and rethrows the AppFailure', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final id = await _card(c, deck, question: 'q');
+    await c.read(reviewProvider.future);
+    await c.read(cardCommandsProvider).deleteCard(id);
+
+    await expectLater(
+      c.read(reviewProvider.notifier).rate(Rating.good),
+      throwsA(isA<NotFound>()),
+    );
+
+    final state = c.read(reviewProvider);
+    expect(state.hasError, isFalse);
+    expect(state.requireValue.index, 0);
+    expect(state.requireValue.saving, isFalse);
+  });
+
+  test('restart returns to the first card', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    await _card(c, deck, question: 'q');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+    await notifier.rate(Rating.good);
+
+    notifier.restart();
+
+    expect(c.read(reviewProvider).requireValue.index, 0);
+  });
+
+  test('startDeck queues only that deck', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final a = await _deck(c, 'A');
+    final b = await _deck(c, 'B');
+    final inA = await _card(
+      c,
+      a,
+      question: 'a',
+      dueAt: _now.add(const Duration(days: 9)),
+    );
+    await _card(c, b, question: 'b');
+    await c.read(reviewProvider.future);
+
+    await c.read(reviewProvider.notifier).startDeck(a);
+
+    final state = c.read(reviewProvider).requireValue;
+    expect(state.cardIds, [inA]);
+    expect(state.index, 0);
+  });
+
+  test('startWeak picks the lowest mastery cards', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final high = await _card(c, deck, question: 'h', mastery: 0.9);
+    final low = await _card(c, deck, question: 'l', mastery: 0.1);
+    final mid = await _card(c, deck, question: 'm', mastery: 0.5);
+    final top = await _card(c, deck, question: 't', mastery: 1);
+    await c.read(reviewProvider.future);
+
+    await c.read(reviewProvider.notifier).startWeak(count: 3);
+
+    final ids = c.read(reviewProvider).requireValue.cardIds;
+    expect(ids, [low, mid, high]);
+    expect(ids, isNot(contains(top)));
+  });
+
+  test('current card reflects a live edit', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final id = await _card(c, deck, question: 'old');
+    await c.read(reviewProvider.future);
+    await c.read(allCardsProvider.future);
+    final seen = <String?>[];
+    c.listen(
+      currentReviewCardProvider,
+      (_, next) => seen.add(next.value?.question),
+      fireImmediately: true,
+    );
+
+    final repo = c.read(cardRepositoryProvider);
+    await repo.update((await repo.byId(id)).copyWith(question: 'new'));
+    await pumpEventQueue();
+
+    expect(seen.last, 'new');
+  });
+
+  test('current card is null when finished or deleted', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final id = await _card(c, deck, question: 'q');
+    await c.read(reviewProvider.future);
+    await c.read(allCardsProvider.future);
+    final sub = c.listen(currentReviewCardProvider, (_, _) {});
+    expect(sub.read().value, isA<Flashcard>());
+
+    await c.read(cardCommandsProvider).deleteCard(id);
+    await pumpEventQueue();
+
+    expect(sub.read(), const AsyncData<Flashcard?>(null));
+  });
+}

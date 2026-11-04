@@ -2,10 +2,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/tab.dart';
 import '../core/dates.dart';
 import '../providers/library_provider.dart';
 import '../providers/review_provider.dart';
-import '../providers/tab_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
@@ -19,8 +19,11 @@ class StatsScreen extends ConsumerStatefulWidget {
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   // Planner inputs belong to this screen only, so plain setState is used.
-  late DateTime _examDate = dateOnly(DateTime.now()).add(const Duration(days: 21));
-  final TextEditingController _totalController = TextEditingController(text: '40');
+  late DateTime _examDate = dateOnly(DateTime.now())
+      .add(const Duration(days: 21));
+  final TextEditingController _totalController = TextEditingController(
+    text: '40',
+  );
   String? _planText;
   int? _planDays;
 
@@ -56,7 +59,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     }
     final perDay = (total / days).ceil();
     setState(() {
-      _planText = '$perDay cards per day to cover all $total cards. Review the weakest ones first.';
+      _planText =
+          '$perDay cards per day to cover all $total cards. Review the weakest ones first.';
       _planDays = days;
     });
   }
@@ -68,9 +72,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final avgMastery = cards.isEmpty
         ? 0.0
         : cards.fold<double>(0, (sum, c) => sum + c.mastery) / cards.length;
-    final weakest = ([...cards]..sort((a, b) => a.mastery.compareTo(b.mastery)))
-        .take(3)
-        .toList();
+    final weakest = ([
+      ...cards,
+    ]..sort((a, b) => a.mastery.compareTo(b.mastery))).take(3).toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -100,7 +104,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               Row(
                 children: [
                   for (final d in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
-                    Expanded(child: Center(child: Text(d, style: kMonoMicro))),
+                    Expanded(
+                      child: Center(child: Text(d, style: kMonoMicro)),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -115,7 +121,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     Container(
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: _missedDays.contains(day) ? AppColors.chip : AppColors.primary,
+                        color: _missedDays.contains(day)
+                            ? AppColors.chip
+                            : AppColors.primary,
                         borderRadius: BorderRadius.circular(8),
                         // Day 28 is today in the placeholder history.
                         border: day == 28
@@ -125,7 +133,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       child: Text(
                         '$day',
                         style: TextStyle(
-                          color: _missedDays.contains(day) ? AppColors.muted : Colors.white,
+                          color: _missedDays.contains(day)
+                              ? AppColors.muted
+                              : Colors.white,
                           fontSize: 12,
                         ),
                       ),
@@ -133,7 +143,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 ],
               ),
               const Divider(height: 24),
-              Text('${28 - _missedDays.length} SESSIONS LOGGED (SAMPLE DATA)', style: kMonoLabel),
+              Text(
+                '${28 - _missedDays.length} SESSIONS LOGGED (SAMPLE DATA)',
+                style: kMonoLabel,
+              ),
             ],
           ),
         ),
@@ -144,8 +157,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             children: [
               Row(
                 children: [
-                  const Expanded(child: Text('MASTERY BY DECK', style: kMonoLabel)),
-                  Text('AVG: ${(avgMastery * 100).round()}%', style: kMonoLabel),
+                  const Expanded(
+                    child: Text('MASTERY BY DECK', style: kMonoLabel),
+                  ),
+                  Text(
+                    'AVG: ${(avgMastery * 100).round()}%',
+                    style: kMonoLabel,
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -153,7 +171,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 height: 200,
                 child: _MasteryChart(
                   labels: [for (final d in decks) d.title],
-                  values: [for (final d in decks) ref.watch(deckMasteryProvider(d.id))],
+                  values: [
+                    for (final d in decks) ref.watch(deckMasteryProvider(d.id)),
+                  ],
                 ),
               ),
             ],
@@ -201,7 +221,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             isDense: true,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                         ),
                       ],
@@ -212,7 +234,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(onPressed: _plan, child: const Text('Plan')),
+                child: FilledButton(
+                  onPressed: _plan,
+                  child: const Text('Plan'),
+                ),
               ),
               if (_planText != null) ...[
                 const SizedBox(height: 12),
@@ -223,8 +248,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     children: [
                       Row(
                         children: [
-                          const Expanded(child: Text('PLAN', style: kMonoLabel)),
-                          if (_planDays != null) PillLabel('$_planDays days', filled: true),
+                          const Expanded(
+                            child: Text('PLAN', style: kMonoLabel),
+                          ),
+                          if (_planDays != null)
+                            PillLabel('$_planDays days', filled: true),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -290,8 +318,12 @@ class _MasteryChart extends StatelessWidget {
         gridData: const FlGridData(show: false),
         barTouchData: const BarTouchData(enabled: false),
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           topTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -334,7 +366,9 @@ class _MasteryChart extends StatelessWidget {
                   toY: values[i] * 100,
                   width: 22,
                   color: AppColors.primary,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(6),
+                  ),
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
                     toY: 100,

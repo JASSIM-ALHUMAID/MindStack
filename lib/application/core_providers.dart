@@ -14,6 +14,7 @@ import '../data/repositories/drift_library_repository.dart';
 import '../data/repositories/drift_review_log_repository.dart';
 import '../data/sample_data.dart';
 import '../data/seed.dart';
+import '../domain/models/quiz_question.dart';
 import '../domain/repositories.dart';
 
 /// The time source. Override in tests with a fixed clock.
@@ -39,6 +40,9 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 final seedDataProvider = Provider<SeedData>(
   (ref) => buildSampleData(ref.watch(clockProvider).now()),
 );
+
+/// The questions the quiz tab asks. Replaced by generated quizzes later.
+final sampleQuizProvider = Provider<List<QuizQuestion>>((ref) => sampleQuiz);
 
 /// Courses and decks.
 final libraryRepositoryProvider = Provider<LibraryRepository>(

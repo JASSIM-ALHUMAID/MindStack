@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../providers/quiz_provider.dart';
+import '../application/quiz.dart';
+import '../application/tab.dart';
 import '../providers/review_provider.dart';
-import '../providers/tab_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 
@@ -38,10 +38,16 @@ class QuizScreen extends ConsumerWidget {
                     color: AppColors.chip,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(LucideIcons.award, color: AppColors.primary),
+                  child: const Icon(
+                    LucideIcons.award,
+                    color: AppColors.primary,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                Text('Quiz complete', style: kSerifTitle.copyWith(fontSize: 24)),
+                Text(
+                  'Quiz complete',
+                  style: kSerifTitle.copyWith(fontSize: 24),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '${quiz.score}/$total',
@@ -93,7 +99,9 @@ class QuizScreen extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(child: Text('WEAK CARDS', style: kMonoLabel)),
+                    const Expanded(
+                      child: Text('WEAK CARDS', style: kMonoLabel),
+                    ),
                     Text(
                       '${quiz.missed.length} WEAK CARD${quiz.missed.length == 1 ? '' : 'S'}',
                       style: kMonoLabel,
@@ -109,7 +117,10 @@ class QuizScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(quiz.questions[i].prompt, style: kSerifTitle.copyWith(fontSize: 17)),
+                        child: Text(
+                          quiz.questions[i].prompt,
+                          style: kSerifTitle.copyWith(fontSize: 17),
+                        ),
                       ),
                       const PillLabel('Missed', color: AppColors.danger),
                     ],
@@ -143,7 +154,10 @@ class QuizScreen extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        ScreenHeader(eyebrow: 'QUESTION ${quiz.index + 1} OF $total', title: 'Quiz'),
+        ScreenHeader(
+          eyebrow: 'QUESTION ${quiz.index + 1} OF $total',
+          title: 'Quiz',
+        ),
         const SizedBox(height: 12),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
@@ -183,9 +197,13 @@ class QuizScreen extends ConsumerWidget {
                   state: !answered
                       ? _OptionState.idle
                       : (i == q.correctIndex
-                          ? _OptionState.correct
-                          : (i == quiz.selected ? _OptionState.wrong : _OptionState.idle)),
-                  onTap: answered ? null : () => ref.read(quizProvider.notifier).select(i),
+                            ? _OptionState.correct
+                            : (i == quiz.selected
+                                  ? _OptionState.wrong
+                                  : _OptionState.idle)),
+                  onTap: answered
+                      ? null
+                      : () => ref.read(quizProvider.notifier).select(i),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -239,8 +257,16 @@ class _OptionTile extends StatelessWidget {
     // Correct = filled green with white text and a check mark (Figma).
     // Wrong = red outline and tint with a cross, so state is not shown by color alone.
     final (Color border, Color fill, Color ink) = switch (state) {
-      _OptionState.correct => (AppColors.success, AppColors.success, Colors.white),
-      _OptionState.wrong => (AppColors.danger, const Color(0xFFFBEAE8), AppColors.danger),
+      _OptionState.correct => (
+        AppColors.success,
+        AppColors.success,
+        Colors.white,
+      ),
+      _OptionState.wrong => (
+        AppColors.danger,
+        const Color(0xFFFBEAE8),
+        AppColors.danger,
+      ),
       _OptionState.idle => (AppColors.border, AppColors.card, AppColors.ink),
     };
     return InkWell(
@@ -262,19 +288,27 @@ class _OptionTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: state == _OptionState.correct ? Colors.white : null,
                 shape: BoxShape.circle,
-                border: Border.all(color: state == _OptionState.idle ? AppColors.border : border),
+                border: Border.all(
+                  color: state == _OptionState.idle ? AppColors.border : border,
+                ),
               ),
               child: Text(
                 letter,
                 style: kMonoMicro.copyWith(
-                  color: state == _OptionState.correct ? AppColors.success : ink,
+                  color: state == _OptionState.correct
+                      ? AppColors.success
+                      : ink,
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Text(text, style: TextStyle(color: ink))),
-            if (state == _OptionState.correct) const Icon(LucideIcons.check, color: Colors.white),
-            if (state == _OptionState.wrong) const Icon(LucideIcons.x, color: AppColors.danger),
+            Expanded(
+              child: Text(text, style: TextStyle(color: ink)),
+            ),
+            if (state == _OptionState.correct)
+              const Icon(LucideIcons.check, color: Colors.white),
+            if (state == _OptionState.wrong)
+              const Icon(LucideIcons.x, color: AppColors.danger),
           ],
         ),
       ),
