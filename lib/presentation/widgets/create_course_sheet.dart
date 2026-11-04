@@ -8,13 +8,14 @@ import '../../core/dates.dart';
 import '../../theme/app_theme.dart';
 import '../format.dart';
 import '../save_feedback.dart';
+import 'sheet_scaffold.dart';
 
 Future<void> showCreateCourseSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.card,
-    builder: (_) => const _CreateCourseSheet(),
+    backgroundColor: Colors.transparent,
+    builder: (_) => const SheetScaffold(child: _CreateCourseSheet()),
   );
 }
 
@@ -81,12 +82,7 @@ class _CreateCourseSheetState extends ConsumerState<_CreateCourseSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        20 + MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Form(
         key: _formKey,
         child: Column(

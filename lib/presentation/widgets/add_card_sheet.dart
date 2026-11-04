@@ -8,13 +8,14 @@ import '../../application/cards.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import 'common.dart';
+import 'sheet_scaffold.dart';
 
 Future<void> showAddCardSheet(BuildContext context, String deckId) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.card,
-    builder: (_) => _AddCardSheet(deckId: deckId),
+    backgroundColor: Colors.transparent,
+    builder: (_) => SheetScaffold(child: _AddCardSheet(deckId: deckId)),
   );
 }
 
@@ -73,12 +74,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
         .valueOrNull
         ?.length;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        20 + MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Form(
         key: _formKey,
         child: Column(

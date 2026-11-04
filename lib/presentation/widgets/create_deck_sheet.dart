@@ -9,6 +9,7 @@ import '../../domain/models/course.dart';
 import '../../route_names.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
+import 'sheet_scaffold.dart';
 
 /// Bottom sheet that adds an empty deck to [course], then opens it in the
 /// Deck Editor so the user can start adding cards. Same layout as Create Course.
@@ -16,8 +17,8 @@ Future<void> showCreateDeckSheet(BuildContext context, Course course) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.card,
-    builder: (_) => _CreateDeckSheet(course: course),
+    backgroundColor: Colors.transparent,
+    builder: (_) => SheetScaffold(child: _CreateDeckSheet(course: course)),
   );
 }
 
@@ -68,12 +69,7 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        20 + MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Form(
         key: _formKey,
         child: Column(
