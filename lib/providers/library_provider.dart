@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/sample_data.dart';
-import '../models/course.dart';
-import '../models/deck.dart';
-import '../models/flashcard.dart';
+import '../domain/enums.dart';
+import '../domain/models/course.dart';
+import '../domain/models/deck.dart';
+import '../domain/models/flashcard.dart';
+import '../domain/scheduler.dart';
 
 class CoursesNotifier extends Notifier<List<Course>> {
   @override
@@ -54,7 +56,7 @@ class CardsNotifier extends Notifier<List<Flashcard>> {
 
   void rate(String id, Rating rating) {
     state = [
-      for (final c in state) c.id == id ? c.applyRating(rating) : c,
+      for (final c in state) c.id == id ? Sm2Scheduler.apply(c, rating, now: DateTime.now()) : c,
     ];
   }
 }

@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../models/course.dart';
-import '../models/deck.dart';
+import '../domain/models/course.dart';
+import '../domain/models/deck.dart';
 import '../providers/library_provider.dart';
 import '../route_names.dart';
 import '../theme/app_theme.dart';
@@ -59,7 +59,7 @@ class _CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days = course.daysToExam();
+    final days = course.daysToExam(DateTime.now());
     return SoftCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(

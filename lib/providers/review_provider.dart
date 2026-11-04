@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/flashcard.dart';
+import '../domain/enums.dart';
+import '../domain/models/flashcard.dart';
 import 'library_provider.dart';
 
 class ReviewState {

@@ -1,8 +1,9 @@
-import '../models/course.dart';
-import '../models/deck.dart';
-import '../models/draft_card.dart';
-import '../models/flashcard.dart';
-import '../models/quiz_question.dart';
+import '../domain/enums.dart';
+import '../domain/models/course.dart';
+import '../domain/models/deck.dart';
+import '../domain/models/draft_card.dart';
+import '../domain/models/flashcard.dart';
+import '../domain/models/quiz_question.dart';
 
 /// Local sample data for Phase 2. In Phase 3 this seeds the SQLite database
 /// on first launch, so the app opens with the same content as the Figma screens.

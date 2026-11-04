@@ -1,3 +1,5 @@
+import '../core/dates.dart';
+
 const List<String> _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -5,9 +7,6 @@ const List<String> _months = [
 
 /// Formats a date like "Nov 18, 2026".
 String formatDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
-
-/// Midnight of the given day, used for day-based comparisons.
-DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
 /// Short interval label for rating buttons, e.g. "<10M", "1D", "12D".
 String formatInterval(Duration d) {

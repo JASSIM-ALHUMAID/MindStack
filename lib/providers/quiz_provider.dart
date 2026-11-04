@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/sample_data.dart';
-import '../models/quiz_question.dart';
+import '../domain/models/quiz_question.dart';
 
 class QuizState {
   final List<QuizQuestion> questions;

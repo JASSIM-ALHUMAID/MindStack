@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../models/flashcard.dart';
+import '../domain/enums.dart';
+import '../domain/models/flashcard.dart';
+import '../domain/scheduler.dart';
 import '../providers/library_provider.dart';
 import '../providers/review_provider.dart';
 import '../providers/settings_provider.dart';
@@ -203,7 +205,7 @@ class _RatingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final next = formatInterval(card.applyRating(rating, now: now).dueAt.difference(now));
+    final next = formatInterval(Sm2Scheduler.apply(card, rating, now: now).dueAt.difference(now));
     final color = switch (rating) {
       Rating.again => AppColors.danger,
       Rating.hard => AppColors.hard,

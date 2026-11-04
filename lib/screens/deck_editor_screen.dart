@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../models/deck.dart';
-import '../models/flashcard.dart';
+import '../domain/models/deck.dart';
+import '../domain/models/flashcard.dart';
 import '../providers/library_provider.dart';
 import '../providers/review_provider.dart';
 import '../providers/tab_provider.dart';

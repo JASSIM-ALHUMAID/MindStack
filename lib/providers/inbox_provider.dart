@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/sample_data.dart';
-import '../models/draft_card.dart';
-import '../models/flashcard.dart';
+import '../domain/models/draft_card.dart';
+import '../domain/models/flashcard.dart';
 import 'library_provider.dart';
 
 class InboxState {

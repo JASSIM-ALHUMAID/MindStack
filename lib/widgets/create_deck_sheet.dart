@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../models/course.dart';
+import '../domain/models/course.dart';
 import '../providers/library_provider.dart';
 import '../route_names.dart';
 import '../theme/app_theme.dart';
