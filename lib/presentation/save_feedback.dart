@@ -17,7 +17,9 @@ String failureMessage(Object error) =>
 /// Runs the write [op] and reports its outcome in a SnackBar.
 ///
 /// On success shows [success] when given and returns `true`. On failure logs
-/// the error once with full detail, shows [failureMessage] and returns
+/// once (at info level for expected outcomes such as [InvalidInput],
+/// [Conflict] and [NotFound]; as an error with full detail for
+/// [StorageFailure] and anything else), shows [failureMessage] and returns
 /// `false`.
 ///
 /// The messenger and logger are captured before awaiting, so the outcome is
@@ -34,7 +36,13 @@ Future<bool> runSave(
   try {
     await op();
   } on Object catch (error, stack) {
-    logger.error('Save failed', error, stack);
+    switch (error) {
+      // Expected outcomes the user can act on, not defects: no error report.
+      case InvalidInput() || Conflict() || NotFound():
+        logger.info('Save rejected: $error');
+      default:
+        logger.error('Save failed', error, stack);
+    }
     messenger.showSnackBar(SnackBar(content: Text(failureMessage(error))));
     return false;
   }

@@ -33,6 +33,12 @@ typedef LoggedError = ({String message, Object error, StackTrace stack});
 final class RecordingLogger implements AppLogger {
   final List<LoggedError> errors = [];
 
+  /// Messages passed to [info].
+  final List<String> infos = [];
+
+  @override
+  void info(String message) => infos.add(message);
+
   @override
   void error(String message, Object error, StackTrace stack) {
     errors.add((message: message, error: error, stack: stack));
