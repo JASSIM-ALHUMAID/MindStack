@@ -78,7 +78,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   /// Throws [NotFound] if the card no longer exists and [StorageFailure] if
   /// the write fails.
   Future<void> rate(Rating rating) async {
-    final current = state.value;
+    final current = state.valueOrNull;
     if (state.isLoading || current == null || current.saving) return;
     if (current.finished) return;
     final session = _session;
@@ -102,7 +102,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
   /// deleted since the queue was built. Does nothing while loading, saving or
   /// finished.
   void skip() {
-    final current = state.value;
+    final current = state.valueOrNull;
     if (state.isLoading || current == null || current.saving) return;
     if (current.finished) return;
     state = AsyncData(current.copyWith(index: current.index + 1));
@@ -110,7 +110,7 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
 
   /// "Review again": returns to the first card of the same queue.
   void restart() {
-    final current = state.value;
+    final current = state.valueOrNull;
     if (current == null) return;
     _session++;
     state = AsyncData(current.copyWith(index: 0, saving: false));
@@ -139,12 +139,16 @@ class ReviewNotifier extends AsyncNotifier<ReviewState> {
     Future<List<Flashcard>> Function() load,
     List<Flashcard> Function(List<Flashcard>) select,
   ) async {
-    _session++;
+    final session = ++_session;
     state = const AsyncLoading<ReviewState>().copyWithPrevious(state);
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       final cards = select(await load());
       return ReviewState(cardIds: [for (final c in cards) c.id]);
     });
+    // A newer start, restart or rebuild replaced this one while it loaded;
+    // its queue (or failure) must not overwrite the newer session.
+    if (session != _session) return;
+    state = result;
   }
 }
 
@@ -162,8 +166,8 @@ final currentReviewCardProvider = Provider<AsyncValue<Flashcard?>>((ref) {
     return AsyncError(session.error!, session.stackTrace!);
   }
   if (cards.hasError) return AsyncError(cards.error!, cards.stackTrace!);
-  final state = session.value;
-  final all = cards.value;
+  final state = session.valueOrNull;
+  final all = cards.valueOrNull;
   if (state == null || all == null) return const AsyncLoading();
   final id = state.currentId;
   if (id == null) return const AsyncData(null);

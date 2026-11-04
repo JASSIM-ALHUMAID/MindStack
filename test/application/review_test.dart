@@ -8,8 +8,10 @@ import 'package:mindstack/application/inbox.dart';
 import 'package:mindstack/application/library.dart';
 import 'package:mindstack/application/review.dart';
 import 'package:mindstack/data/drift_transaction_runner.dart';
+import 'package:mindstack/data/repositories/drift_card_repository.dart';
 import 'package:mindstack/domain/enums.dart';
 import 'package:mindstack/domain/failures.dart';
+import 'package:mindstack/domain/models/deck_stats.dart';
 import 'package:mindstack/domain/models/flashcard.dart';
 import 'package:mindstack/domain/repositories.dart';
 
@@ -57,6 +59,52 @@ final class _GatedRunner implements TransactionRunner {
     await gate;
     return _inner.run(action);
   }
+}
+
+/// A [CardRepository] whose `watchByDeck` stream waits for [gate] before it
+/// emits; everything else is delegated.
+final class _GatedDeckCards implements CardRepository {
+  _GatedDeckCards(this._inner, this.gate);
+
+  final CardRepository _inner;
+  final Future<void> gate;
+
+  @override
+  Stream<List<Flashcard>> watchByDeck(String deckId) async* {
+    await gate;
+    yield* _inner.watchByDeck(deckId);
+  }
+
+  @override
+  Stream<List<Flashcard>> watchAll() => _inner.watchAll();
+
+  @override
+  Stream<Map<String, DeckStats>> watchDeckStats() => _inner.watchDeckStats();
+
+  @override
+  Future<List<Flashcard>> due({required DateTime now, String? deckId}) =>
+      _inner.due(now: now, deckId: deckId);
+
+  @override
+  Future<Flashcard> byId(String id) => _inner.byId(id);
+
+  @override
+  Future<void> insert(Flashcard card) => _inner.insert(card);
+
+  @override
+  Future<void> insertAll(List<Flashcard> cards) => _inner.insertAll(cards);
+
+  @override
+  Future<void> update(Flashcard card) => _inner.update(card);
+
+  @override
+  Future<void> delete(String id) => _inner.delete(id);
+
+  @override
+  Future<int> moveToDeck({
+    required String fromDeckId,
+    required String toDeckId,
+  }) => _inner.moveToDeck(fromDeckId: fromDeckId, toDeckId: toDeckId);
 }
 
 void main() {
@@ -303,6 +351,37 @@ void main() {
       expect((await c.read(cardRepositoryProvider).byId(id)).repetitions, 1);
     },
   );
+
+  test('the newer start wins when an older one finishes last', () async {
+    final slow = Completer<void>();
+    late String deckA;
+    final c = makeContainer(
+      clock: FixedClock(_now),
+      overrides: [
+        cardRepositoryProvider.overrideWith(
+          (ref) => _GatedDeckCards(
+            DriftCardRepository(ref.watch(databaseProvider)),
+            slow.future,
+          ),
+        ),
+      ],
+    );
+    deckA = await _deck(c, 'A');
+    await _card(c, deckA, question: 'in A', mastery: 0.5);
+    final deckB = await _deck(c, 'B');
+    final weak = await _card(c, deckB, question: 'in B');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+
+    final older = notifier.startDeck(deckA);
+    await notifier.startWeak(count: 1);
+    final newer = c.read(reviewProvider).requireValue.cardIds;
+    slow.complete();
+    await older;
+
+    expect(c.read(reviewProvider).requireValue.cardIds, newer);
+    expect(newer, [weak]);
+  });
 }
 
 final class _SwitchRunner implements TransactionRunner {
