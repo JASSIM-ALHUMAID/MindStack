@@ -1,11 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../application/quiz.dart';
-import '../application/tab.dart';
-import '../providers/review_provider.dart';
-import '../theme/app_theme.dart';
+import '../../application/quiz.dart';
+import '../../application/review.dart';
+import '../../application/tab.dart';
+import '../../theme/app_theme.dart';
 import '../widgets/common.dart';
 
 class QuizScreen extends ConsumerWidget {
@@ -134,7 +136,9 @@ class QuizScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: () {
-                    ref.read(reviewProvider.notifier).startWeak();
+                    // Loads the queue in the background; the Review tab shows its own
+                    // loading and error states.
+                    unawaited(ref.read(reviewProvider.notifier).startWeak());
                     ref.read(tabIndexProvider.notifier).set(2);
                   },
                   iconAlignment: IconAlignment.end,

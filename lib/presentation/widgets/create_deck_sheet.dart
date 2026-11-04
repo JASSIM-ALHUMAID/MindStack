@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../domain/models/course.dart';
-import '../providers/library_provider.dart';
-import '../route_names.dart';
-import '../theme/app_theme.dart';
+import '../../application/library.dart';
+import '../../domain/models/course.dart';
+import '../../route_names.dart';
+import '../../theme/app_theme.dart';
+import '../save_feedback.dart';
 
 /// Bottom sheet that adds an empty deck to [course], then opens it in the
 /// Deck Editor so the user can start adding cards. Same layout as Create Course.
@@ -32,6 +33,7 @@ class _CreateDeckSheet extends ConsumerStatefulWidget {
 class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -39,17 +41,28 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
     super.dispose();
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    final id = ref.read(decksProvider.notifier).add(
-          courseId: widget.course.id,
-          title: _titleController.text.trim(),
-        );
-    // Close the sheet, then open the new deck so cards can be added right away.
+  Future<void> _save() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final commands = ref.read(libraryCommandsProvider);
     final router = GoRouter.of(context);
-    Navigator.pop(context);
+    final navigator = Navigator.of(context);
+    String? deckId;
+    final saved = await runSave(context, ref, () async {
+      deckId = await commands.createDeck(
+        courseId: widget.course.id,
+        title: _titleController.text,
+      );
+    });
+    if (!mounted) return;
+    if (!saved) {
+      setState(() => _saving = false);
+      return;
+    }
+    // Close the sheet, then open the new deck so cards can be added right away.
+    navigator.pop();
     // Fire-and-forget: this sheet is closed, so nothing waits on the pop result.
-    unawaited(router.push<void>(RouteNames.deckPath(id)));
+    unawaited(router.push<void>(RouteNames.deckPath(deckId!)));
   }
 
   @override
@@ -67,7 +80,10 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('NEW DECK · ${widget.course.title.toUpperCase()}', style: kMonoLabel),
+            Text(
+              'NEW DECK · ${widget.course.title.toUpperCase()}',
+              style: kMonoLabel,
+            ),
             const SizedBox(height: 4),
             const Text('Create Deck', style: kSerifTitle),
             const SizedBox(height: 16),
@@ -75,7 +91,7 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
               controller: _titleController,
               autofocus: true,
               textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _save(),
+              onFieldSubmitted: (_) => unawaited(_save()),
               decoration: const InputDecoration(
                 labelText: 'Deck title',
                 hintText: 'e.g. State management',
@@ -87,7 +103,10 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(onPressed: _save, child: const Text('Save Deck')),
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: const Text('Save Deck'),
+              ),
             ),
             const SizedBox(height: 8),
             SizedBox(

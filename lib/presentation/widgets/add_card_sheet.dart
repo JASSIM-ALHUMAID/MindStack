@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../domain/models/flashcard.dart';
-import '../providers/library_provider.dart';
-import '../theme/app_theme.dart';
+import '../../application/cards.dart';
+import '../../theme/app_theme.dart';
+import '../save_feedback.dart';
 import 'common.dart';
 
 Future<void> showAddCardSheet(BuildContext context, String deckId) {
@@ -29,6 +31,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
   final _formKey = GlobalKey<FormState>();
   final _questionController = TextEditingController();
   final _answerController = TextEditingController();
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -37,24 +40,35 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
     super.dispose();
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    final now = DateTime.now();
-    ref.read(cardsProvider.notifier).add(
-          Flashcard(
-            id: 'k${now.microsecondsSinceEpoch}',
-            deckId: widget.deckId,
-            question: _questionController.text.trim(),
-            answer: _answerController.text.trim(),
-            dueAt: now,
-          ),
-        );
-    Navigator.pop(context);
+  Future<void> _save() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final commands = ref.read(cardCommandsProvider);
+    final navigator = Navigator.of(context);
+    final saved = await runSave(
+      context,
+      ref,
+      () => commands.addCard(
+        deckId: widget.deckId,
+        question: _questionController.text,
+        answer: _answerController.text,
+      ),
+    );
+    // The sheet may have been dismissed while saving; then there is nothing
+    // left to close or re-enable.
+    if (!mounted) return;
+    if (saved) {
+      navigator.pop();
+    } else {
+      setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final cardNumber = ref.watch(deckCardsProvider(widget.deckId)).length + 1;
+    // The number is cosmetic, so it is left blank rather than blocking the
+    // form while the count loads or if it fails.
+    final count = ref.watch(deckCardsProvider(widget.deckId)).value?.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -72,7 +86,8 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
               children: [
                 const Text('Add card', style: kSerifTitle),
                 const SizedBox(width: 8),
-                Text('#$cardNumber IN DECK', style: kMonoLabel),
+                if (count != null)
+                  Text('#${count + 1} IN DECK', style: kMonoLabel),
                 const Spacer(),
                 const PillLabel('Drafting'),
               ],
@@ -105,7 +120,11 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
               ),
               child: const Row(
                 children: [
-                  Icon(LucideIcons.bookOpen, size: 18, color: AppColors.primary),
+                  Icon(
+                    LucideIcons.bookOpen,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -120,7 +139,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _save,
+                onPressed: _saving ? null : _save,
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(LucideIcons.arrowRight, size: 18),
                 label: const Text('Save card'),

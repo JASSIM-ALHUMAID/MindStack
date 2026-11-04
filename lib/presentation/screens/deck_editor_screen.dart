@@ -5,13 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../application/tab.dart';
-import '../domain/models/deck.dart';
-import '../domain/models/flashcard.dart';
-import '../providers/library_provider.dart';
-import '../providers/review_provider.dart';
-import '../theme/app_theme.dart';
+import '../../application/cards.dart';
+import '../../application/core_providers.dart';
+import '../../application/library.dart';
+import '../../application/review.dart';
+import '../../application/tab.dart';
+import '../../domain/models/deck.dart';
+import '../../domain/models/flashcard.dart';
+import '../../theme/app_theme.dart';
+import '../save_feedback.dart';
 import '../widgets/add_card_sheet.dart';
+import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
 
 class DeckEditorScreen extends ConsumerWidget {
@@ -21,16 +25,52 @@ class DeckEditorScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deck = ref
-        .watch(decksProvider)
-        .where((d) => d.id == deckId)
-        .firstOrNull;
-    // The deck can disappear while this screen closes after a merge.
-    if (deck == null) return const Scaffold();
-    final cards = ref.watch(deckCardsProvider(deckId));
-    final reviewable = cards
-        .where((c) => !c.dueAt.isAfter(DateTime.now()))
-        .length;
+    final deck = ref.watch(deckProvider(deckId));
+    final loaded = deck.value;
+    if (loaded != null) return _DeckEditor(deck: loaded);
+    // Loading, failed, or the deck does not exist (any more), for example
+    // because it was deleted or merged while this screen was open.
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        leading: IconButton(
+          tooltip: 'Back to Library',
+          icon: const Icon(LucideIcons.chevronLeft),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: AsyncValueView<Deck?>(
+        value: deck,
+        data: (_) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('This deck no longer exists.'),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => context.pop(),
+                child: const Text('Back to Library'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeckEditor extends ConsumerWidget {
+  final Deck deck;
+
+  const _DeckEditor({required this.deck});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final deckId = deck.id;
+    final cardsValue = ref.watch(deckCardsProvider(deckId));
+    final cards = cardsValue.value ?? const <Flashcard>[];
+    final now = ref.read(clockProvider).now();
+    final reviewable = cards.where((c) => !c.dueAt.isAfter(now)).length;
     final newCount = cards.where((c) => c.isNew).length;
 
     return Scaffold(
@@ -53,7 +93,7 @@ class DeckEditorScreen extends ConsumerWidget {
         ),
         actions: [
           FilledButton.icon(
-            onPressed: () => showAddCardSheet(context, deckId),
+            onPressed: () => unawaited(showAddCardSheet(context, deckId)),
             icon: const Icon(LucideIcons.plus, size: 18),
             label: const Text('Card'),
           ),
@@ -66,14 +106,12 @@ class DeckEditorScreen extends ConsumerWidget {
                   // The menu callback is synchronous; the merge flow reports
                   // its own outcome through the sheet and snackbars.
                   unawaited(_mergeDeck(context, ref, deck));
-                  break;
                 case _DeckAction.share:
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Deck sharing arrives in Phase 3'),
                     ),
                   );
-                  break;
               }
             },
             itemBuilder: (_) => const [
@@ -95,15 +133,18 @@ class DeckEditorScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: cards.isEmpty
-          ? const Center(child: Text('No cards yet. Tap + Card to add one.'))
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: cards.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, i) =>
-                  _CardTile(number: i + 1, card: cards[i]),
-            ),
+      body: AsyncValueView<List<Flashcard>>(
+        value: cardsValue,
+        data: (cards) => cards.isEmpty
+            ? const Center(child: Text('No cards yet. Tap + Card to add one.'))
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: cards.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, i) =>
+                    _CardTile(number: i + 1, card: cards[i]),
+              ),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -126,7 +167,11 @@ class DeckEditorScreen extends ConsumerWidget {
                   onPressed: cards.isEmpty
                       ? null
                       : () {
-                          ref.read(reviewProvider.notifier).startDeck(deckId);
+                          // Loads the queue in the background; the Review tab
+                          // shows its own loading and error states.
+                          unawaited(
+                            ref.read(reviewProvider.notifier).startDeck(deckId),
+                          );
                           ref.read(tabIndexProvider.notifier).set(2);
                           context.pop();
                         },
@@ -146,7 +191,10 @@ enum _DeckAction { merge, share }
 /// Merge flow: pick the target deck in a bottom sheet, confirm in a dialog,
 /// then move the cards, remove this deck and return to Library.
 Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
-  final others = ref.read(decksProvider).where((d) => d.id != deck.id).toList();
+  final others = [
+    for (final d in ref.read(decksProvider).value ?? const <Deck>[])
+      if (d.id != deck.id) d,
+  ];
   final target = await showModalBottomSheet<Deck>(
     context: context,
     backgroundColor: AppColors.card,
@@ -187,7 +235,7 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
   );
   if (target == null || !context.mounted) return;
 
-  final count = ref.read(deckCardsProvider(deck.id)).length;
+  final count = ref.read(deckCardsProvider(deck.id)).value?.length ?? 0;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -210,23 +258,49 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
   );
   if (confirmed != true || !context.mounted) return;
 
-  final messenger = ScaffoldMessenger.of(context);
-  context.pop();
-  ref.read(cardsProvider.notifier).moveToDeck(deck.id, target.id);
-  ref.read(decksProvider.notifier).remove(deck.id);
-  messenger.showSnackBar(
-    SnackBar(content: Text('Merged "${deck.title}" into "${target.title}"')),
+  final commands = ref.read(libraryCommandsProvider);
+  // The merge removes this deck, which replaces the editor with its
+  // "no longer exists" state and unmounts [context]; leave through the router.
+  final router = GoRouter.of(context);
+  final saved = await runSave(
+    context,
+    ref,
+    () => commands.mergeDecks(fromId: deck.id, toId: target.id),
+    success: 'Merged ${deck.title} into ${target.title}',
   );
+  if (saved) router.pop();
 }
 
-class _CardTile extends ConsumerWidget {
+class _CardTile extends ConsumerStatefulWidget {
   final int number;
   final Flashcard card;
 
   const _CardTile({required this.number, required this.card});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CardTile> createState() => _CardTileState();
+}
+
+class _CardTileState extends ConsumerState<_CardTile> {
+  bool _deleting = false;
+
+  Future<void> _delete() async {
+    setState(() => _deleting = true);
+    final commands = ref.read(cardCommandsProvider);
+    final deleted = await runSave(
+      context,
+      ref,
+      () => commands.deleteCard(widget.card.id),
+      success: 'Card deleted',
+    );
+    // On success the tile leaves the list; on failure let the user retry.
+    if (!deleted && mounted) setState(() => _deleting = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final card = widget.card;
+    final number = widget.number;
     return SoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,12 +342,7 @@ class _CardTile extends ConsumerWidget {
                 child: const Text('Edit'),
               ),
               TextButton(
-                onPressed: () {
-                  ref.read(cardsProvider.notifier).remove(card.id);
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Card deleted')));
-                },
+                onPressed: _deleting ? null : _delete,
                 style: TextButton.styleFrom(foregroundColor: AppColors.danger),
                 child: const Text('Delete'),
               ),

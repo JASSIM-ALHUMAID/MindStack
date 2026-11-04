@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Rounded card used across all screens (matches the Figma cards).
 class SoftCard extends StatelessWidget {

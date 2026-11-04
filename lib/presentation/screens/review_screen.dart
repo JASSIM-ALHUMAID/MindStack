@@ -1,15 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../application/settings.dart';
-import '../domain/enums.dart';
-import '../domain/models/flashcard.dart';
-import '../domain/scheduler.dart';
-import '../providers/library_provider.dart';
-import '../providers/review_provider.dart';
-import '../theme/app_theme.dart';
-import '../utils/format.dart';
+import '../../application/cards.dart';
+import '../../application/core_providers.dart';
+import '../../application/library.dart';
+import '../../application/review.dart';
+import '../../application/settings.dart';
+import '../../domain/enums.dart';
+import '../../domain/models/deck.dart';
+import '../../domain/models/flashcard.dart';
+import '../../domain/scheduler.dart';
+import '../../theme/app_theme.dart';
+import '../format.dart';
+import '../save_feedback.dart';
+import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
 
 class ReviewScreen extends ConsumerStatefulWidget {
@@ -23,16 +30,25 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   // Temporary UI detail owned by this screen only, so plain setState is enough.
   bool _showAnswer = false;
 
-  void _rate(Rating rating) {
-    ref.read(reviewProvider.notifier).rate(rating);
-    setState(() => _showAnswer = false);
+  Future<void> _rate(Rating rating) async {
+    final notifier = ref.read(reviewProvider.notifier);
+    final rated = await runSave(context, ref, () => notifier.rate(rating));
+    // On failure the same card stays up with its answer shown, so the user
+    // can pick a rating again.
+    if (rated && mounted) setState(() => _showAnswer = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final review = ref.watch(reviewProvider);
+    return AsyncValueView<ReviewState>(
+      value: ref.watch(reviewProvider),
+      data: _buildSession,
+    );
+  }
+
+  Widget _buildSession(ReviewState review) {
     final settings = ref.watch(settingsProvider);
-    final total = review.queue.length;
+    final total = review.cardIds.length;
     final done = review.index.clamp(0, total);
     final percent = total == 0 ? 0 : (done * 100 / total).round();
 
@@ -77,15 +93,24 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
             child: Center(child: Text('Nothing due right now.')),
           )
         else if (review.finished)
-          _SessionComplete(queue: review.queue)
+          _SessionComplete(cardIds: review.cardIds)
         else
-          _CardView(
-            card: review.current!,
-            number: review.index + 1,
-            total: total,
-            showAnswer: _showAnswer,
-            onFlip: () => setState(() => _showAnswer = !_showAnswer),
-            onRate: _rate,
+          AsyncValueView<Flashcard?>(
+            value: ref.watch(currentReviewCardProvider),
+            data: (card) => card == null
+                ? const SoftCard(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('This card no longer exists.')),
+                  )
+                : _CardView(
+                    card: card,
+                    number: review.index + 1,
+                    total: total,
+                    showAnswer: _showAnswer,
+                    saving: review.saving,
+                    onFlip: () => setState(() => _showAnswer = !_showAnswer),
+                    onRate: (rating) => unawaited(_rate(rating)),
+                  ),
           ),
       ],
     );
@@ -97,6 +122,9 @@ class _CardView extends ConsumerWidget {
   final int number;
   final int total;
   final bool showAnswer;
+
+  /// A rating is being written; the rating buttons are disabled.
+  final bool saving;
   final VoidCallback onFlip;
   final ValueChanged<Rating> onRate;
 
@@ -105,16 +133,17 @@ class _CardView extends ConsumerWidget {
     required this.number,
     required this.total,
     required this.showAnswer,
+    required this.saving,
     required this.onFlip,
     required this.onRate,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deck = ref
-        .watch(decksProvider)
-        .where((d) => d.id == card.deckId)
-        .firstOrNull;
+    final decks = ref.watch(decksProvider).value;
+    final deck = decks?.where((d) => d.id == card.deckId).firstOrNull;
+    // Blank while the decks load; "Unknown" only once they say it is missing.
+    final deckTitle = deck?.title ?? (decks == null ? '' : 'Unknown');
     final interval = card.isNew
         ? 'NEW'
         : '${card.intervalDays} DAY${card.intervalDays == 1 ? '' : 'S'}';
@@ -128,7 +157,7 @@ class _CardView extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                'DECK: ${(deck?.title ?? 'Unknown').toUpperCase()}',
+                'DECK: ${deckTitle.toUpperCase()}',
                 style: kMonoMicro,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -207,7 +236,11 @@ class _CardView extends ConsumerWidget {
             crossAxisSpacing: 12,
             children: [
               for (final r in Rating.values)
-                _RatingButton(rating: r, card: card, onTap: () => onRate(r)),
+                _RatingButton(
+                  rating: r,
+                  card: card,
+                  onTap: saving ? null : () => onRate(r),
+                ),
             ],
           ),
         ] else
@@ -221,10 +254,12 @@ class _CardView extends ConsumerWidget {
 
 /// One of the four colored rating buttons. Shows when the card would come
 /// back if the user picked this rating (computed with the real scheduler).
-class _RatingButton extends StatelessWidget {
+class _RatingButton extends ConsumerWidget {
   final Rating rating;
   final Flashcard card;
-  final VoidCallback onTap;
+
+  /// Null while a rating is being saved.
+  final VoidCallback? onTap;
 
   const _RatingButton({
     required this.rating,
@@ -233,8 +268,8 @@ class _RatingButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = ref.read(clockProvider).now();
     final next = formatInterval(
       Sm2Scheduler.apply(card, rating, now: now).dueAt.difference(now),
     );
@@ -278,20 +313,34 @@ class _RatingButton extends StatelessWidget {
 }
 
 class _SessionComplete extends ConsumerWidget {
-  /// The cards in this session (as they were before rating).
-  final List<Flashcard> queue;
+  /// Ids of the cards in this session, in review order.
+  final List<String> cardIds;
 
-  const _SessionComplete({required this.queue});
+  const _SessionComplete({required this.cardIds});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ids = {for (final c in queue) c.id};
-    // Look up the updated cards so intervals and due dates are after rating.
-    final reviewed = ref
-        .watch(cardsProvider)
-        .where((c) => ids.contains(c.id))
-        .toList();
-    final decks = ref.watch(decksProvider);
+    return AsyncValueView<List<Flashcard>>(
+      value: ref.watch(allCardsProvider),
+      data: (cards) => AsyncValueView<List<Deck>>(
+        value: ref.watch(decksProvider),
+        data: (decks) => _buildSummary(ref, _reviewed(cards), decks),
+      ),
+    );
+  }
+
+  /// The session's cards as stored now, so intervals and due dates are the
+  /// ones after rating. Cards deleted since are skipped.
+  List<Flashcard> _reviewed(List<Flashcard> all) {
+    final byId = {for (final c in all) c.id: c};
+    return [for (final id in cardIds) ?byId[id]];
+  }
+
+  Widget _buildSummary(
+    WidgetRef ref,
+    List<Flashcard> reviewed,
+    List<Deck> decks,
+  ) {
     final nextDue = reviewed.isEmpty
         ? null
         : reviewed.map((c) => c.dueAt).reduce((a, b) => a.isBefore(b) ? a : b);
@@ -325,11 +374,11 @@ class _SessionComplete extends ConsumerWidget {
                 style: TextStyle(color: AppColors.muted),
               ),
               const SizedBox(height: 12),
-              PillLabel('${queue.length} cards reviewed'),
+              PillLabel('${cardIds.length} cards reviewed'),
               if (nextDue != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'NEXT DUE: ${formatDueDay(nextDue).toUpperCase()}',
+                  'NEXT DUE: ${formatDueDay(nextDue, ref.read(clockProvider).now()).toUpperCase()}',
                   style: kMonoLabel,
                 ),
               ],

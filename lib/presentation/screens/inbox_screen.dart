@@ -1,15 +1,43 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../domain/models/draft_card.dart';
-import '../providers/inbox_provider.dart';
-import '../providers/library_provider.dart';
-import '../theme/app_theme.dart';
+import '../../application/inbox.dart';
+import '../../application/library.dart';
+import '../../domain/models/deck.dart';
+import '../../domain/models/draft_card.dart';
+import '../../theme/app_theme.dart';
+import '../save_feedback.dart';
+import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
 
 class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AsyncValueView<List<DraftCard>>(
+      value: ref.watch(draftsProvider),
+      data: (drafts) => _InboxContent(drafts: drafts),
+    );
+  }
+}
+
+class _InboxContent extends ConsumerStatefulWidget {
+  final List<DraftCard> drafts;
+
+  const _InboxContent({required this.drafts});
+
+  @override
+  ConsumerState<_InboxContent> createState() => _InboxContentState();
+}
+
+class _InboxContentState extends ConsumerState<_InboxContent> {
+  /// True while CLEAR or "Save selected" is writing, so neither can be
+  /// started twice.
+  bool _busy = false;
 
   void _notImplemented(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -17,8 +45,15 @@ class InboxScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _chooseDeck(BuildContext context, WidgetRef ref) async {
-    final decks = ref.read(decksProvider);
+  Future<void> _clear() async {
+    setState(() => _busy = true);
+    final commands = ref.read(inboxCommandsProvider);
+    await runSave(context, ref, commands.clear);
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _chooseDeck() async {
+    final decks = ref.read(decksProvider).value ?? const <Deck>[];
     final deckId = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.card,
@@ -50,28 +85,40 @@ class InboxScreen extends ConsumerWidget {
         ),
       ),
     );
-    if (deckId == null || !context.mounted) return;
-    final count = ref.read(inboxProvider.notifier).saveSelectedTo(deckId);
+    if (deckId == null || !mounted) return;
+    setState(() => _busy = true);
+    final commands = ref.read(inboxCommandsProvider);
+    final messenger = ScaffoldMessenger.of(context);
     final deckTitle = decks.firstWhere((d) => d.id == deckId).title;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$count cards saved to $deckTitle')),
-    );
+    int? count;
+    final saved = await runSave(context, ref, () async {
+      count = await commands.saveSelectedTo(deckId);
+    });
+    if (saved) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('$count cards saved to $deckTitle')),
+      );
+    }
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final inbox = ref.watch(inboxProvider);
+  Widget build(BuildContext context) {
+    final drafts = widget.drafts;
+    final selectedCount = drafts.where((d) => d.selected).length;
+    final ocrProgress = ref.watch(ocrProgressProvider);
+    // Watched so the decks are loaded by the time the deck chooser opens; the
+    // save button stays disabled until they are.
+    final decksReady = ref.watch(decksProvider).hasValue;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
         ScreenHeader(
-          eyebrow: 'OCR QUEUE · ${inbox.drafts.length} PENDING',
+          eyebrow: 'OCR QUEUE · ${drafts.length} PENDING',
           title: 'Inbox',
           trailing: TextButton(
-            onPressed: inbox.drafts.isEmpty
-                ? null
-                : () => ref.read(inboxProvider.notifier).clear(),
+            onPressed: drafts.isEmpty || _busy ? null : _clear,
             child: const Text('CLEAR', style: kMonoLabel),
           ),
         ),
@@ -109,14 +156,16 @@ class InboxScreen extends ConsumerWidget {
               const SizedBox(height: 4),
               TextButton.icon(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Importing shared decks arrives in Phase 3')),
+                  const SnackBar(
+                    content: Text('Importing shared decks arrives in Phase 3'),
+                  ),
                 ),
                 icon: const Icon(LucideIcons.fileUp, size: 18),
                 label: const Text('Import a shared deck (.mindstack)'),
               ),
-              if (inbox.ocrProgress != null) ...[
+              if (ocrProgress != null) ...[
                 const SizedBox(height: 12),
-                LinearProgressIndicator(value: inbox.ocrProgress),
+                LinearProgressIndicator(value: ocrProgress),
               ],
             ],
           ),
@@ -124,32 +173,51 @@ class InboxScreen extends ConsumerWidget {
         const SizedBox(height: 20),
         const Text('Draft cards', style: kSerifSection),
         const SizedBox(height: 8),
-        if (inbox.drafts.isEmpty)
+        if (drafts.isEmpty)
           const SoftCard(
             padding: EdgeInsets.all(32),
-            child: Center(child: Text('No drafts yet. Import something above.')),
+            child: Center(
+              child: Text('No drafts yet. Import something above.'),
+            ),
           ),
-        for (final draft in inbox.drafts) ...[
-          _DraftTile(draft: draft),
+        for (final draft in drafts) ...[
+          _DraftTile(key: ValueKey(draft.id), draft: draft),
           const SizedBox(height: 12),
         ],
-        if (inbox.drafts.isNotEmpty)
+        if (drafts.isNotEmpty)
           FilledButton(
-            onPressed: inbox.selectedCount == 0 ? null : () => _chooseDeck(context, ref),
-            child: Text('Save selected (${inbox.selectedCount}) to a deck'),
+            onPressed: selectedCount == 0 || _busy || !decksReady
+                ? null
+                : _chooseDeck,
+            child: Text('Save selected ($selectedCount) to a deck'),
           ),
       ],
     );
   }
 }
 
-class _DraftTile extends ConsumerWidget {
+class _DraftTile extends ConsumerStatefulWidget {
   final DraftCard draft;
 
-  const _DraftTile({required this.draft});
+  const _DraftTile({super.key, required this.draft});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DraftTile> createState() => _DraftTileState();
+}
+
+class _DraftTileState extends ConsumerState<_DraftTile> {
+  bool _toggling = false;
+
+  Future<void> _toggle() async {
+    setState(() => _toggling = true);
+    final commands = ref.read(inboxCommandsProvider);
+    await runSave(context, ref, () => commands.toggle(widget.draft.id));
+    if (mounted) setState(() => _toggling = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final draft = widget.draft;
     return SoftCard(
       padding: const EdgeInsets.fromLTRB(4, 4, 16, 14),
       child: Row(
@@ -157,8 +225,10 @@ class _DraftTile extends ConsumerWidget {
         children: [
           // Round checkmark from Figma. IconButton keeps a 48 dp tap target.
           IconButton(
-            tooltip: draft.selected ? 'Leave out this draft' : 'Keep this draft',
-            onPressed: () => ref.read(inboxProvider.notifier).toggle(draft.id),
+            tooltip: draft.selected
+                ? 'Leave out this draft'
+                : 'Keep this draft',
+            onPressed: _toggling ? null : _toggle,
             icon: Icon(
               draft.selected ? LucideIcons.circleCheck : LucideIcons.circle,
               color: draft.selected ? AppColors.primary : AppColors.muted,
@@ -173,12 +243,20 @@ class _DraftTile extends ConsumerWidget {
                     PillLabel(draft.source.name),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(draft.sourceRef.toUpperCase(), style: kMonoMicro),
+                      child: Text(
+                        draft.sourceRef.toUpperCase(),
+                        style: kMonoMicro,
+                      ),
                     ),
                     TextButton(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Editing drafts arrives in Phase 3')),
-                      ),
+                      onPressed: () => ScaffoldMessenger.of(context)
+                          .showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Editing drafts arrives in Phase 3',
+                              ),
+                            ),
+                          ),
                       child: const Text('EDIT', style: kMonoLabel),
                     ),
                   ],

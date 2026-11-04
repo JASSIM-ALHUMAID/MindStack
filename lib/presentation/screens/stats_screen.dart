@@ -1,13 +1,21 @@
+import 'dart:async';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../application/tab.dart';
-import '../core/dates.dart';
-import '../providers/library_provider.dart';
-import '../providers/review_provider.dart';
-import '../theme/app_theme.dart';
-import '../utils/format.dart';
+import '../../application/cards.dart';
+import '../../application/core_providers.dart';
+import '../../application/library.dart';
+import '../../application/review.dart';
+import '../../application/tab.dart';
+import '../../core/dates.dart';
+import '../../domain/models/deck.dart';
+import '../../domain/models/deck_stats.dart';
+import '../../domain/models/flashcard.dart';
+import '../../theme/app_theme.dart';
+import '../format.dart';
+import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
 
 class StatsScreen extends ConsumerStatefulWidget {
@@ -19,7 +27,7 @@ class StatsScreen extends ConsumerStatefulWidget {
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   // Planner inputs belong to this screen only, so plain setState is used.
-  late DateTime _examDate = dateOnly(DateTime.now())
+  late DateTime _examDate = dateOnly(ref.read(clockProvider).now())
       .add(const Duration(days: 21));
   final TextEditingController _totalController = TextEditingController(
     text: '40',
@@ -37,7 +45,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   Future<void> _pickDate() async {
-    final today = dateOnly(DateTime.now());
+    final today = dateOnly(ref.read(clockProvider).now());
     final picked = await showDatePicker(
       context: context,
       initialDate: _examDate,
@@ -49,7 +57,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
   void _plan() {
     final total = int.tryParse(_totalController.text.trim());
-    final days = _examDate.difference(dateOnly(DateTime.now())).inDays;
+    final days = _examDate
+        .difference(dateOnly(ref.read(clockProvider).now()))
+        .inDays;
     if (total == null || total <= 0 || days <= 0) {
       setState(() {
         _planText = 'Enter a card total and an exam date in the future.';
@@ -67,15 +77,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final decks = ref.watch(decksProvider);
-    final cards = ref.watch(cardsProvider);
-    final avgMastery = cards.isEmpty
-        ? 0.0
-        : cards.fold<double>(0, (sum, c) => sum + c.mastery) / cards.length;
-    final weakest = ([
-      ...cards,
-    ]..sort((a, b) => a.mastery.compareTo(b.mastery))).take(3).toList();
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
@@ -152,31 +153,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         ),
         const SizedBox(height: 16),
         SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text('MASTERY BY DECK', style: kMonoLabel),
-                  ),
-                  Text(
-                    'AVG: ${(avgMastery * 100).round()}%',
-                    style: kMonoLabel,
-                  ),
-                ],
+          child: AsyncValueView<List<Flashcard>>(
+            value: ref.watch(allCardsProvider),
+            data: (cards) => AsyncValueView<List<Deck>>(
+              value: ref.watch(decksProvider),
+              data: (decks) => AsyncValueView<Map<String, DeckStats>>(
+                value: ref.watch(deckStatsProvider),
+                data: (stats) =>
+                    _MasterySection(cards: cards, decks: decks, stats: stats),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 200,
-                child: _MasteryChart(
-                  labels: [for (final d in decks) d.title],
-                  values: [
-                    for (final d in decks) ref.watch(deckMasteryProvider(d.id)),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -266,33 +252,92 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         ),
         const SizedBox(height: 16),
         SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('WEAKEST CARDS', style: kMonoLabel),
-              const SizedBox(height: 8),
-              for (final card in weakest)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(card.question)),
-                      const PillLabel('WEAK'),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    ref.read(reviewProvider.notifier).startWeak();
-                    ref.read(tabIndexProvider.notifier).set(2);
-                  },
-                  child: Text('Drill ${weakest.length} weak cards now'),
-                ),
-              ),
-            ],
+          child: AsyncValueView<List<Flashcard>>(
+            value: ref.watch(allCardsProvider),
+            data: (cards) => _WeakestSection(cards: cards),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Average mastery and the per-deck mastery chart.
+class _MasterySection extends StatelessWidget {
+  final List<Flashcard> cards;
+  final List<Deck> decks;
+  final Map<String, DeckStats> stats;
+
+  const _MasterySection({
+    required this.cards,
+    required this.decks,
+    required this.stats,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avgMastery = cards.isEmpty
+        ? 0.0
+        : cards.fold<double>(0, (sum, c) => sum + c.mastery) / cards.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: Text('MASTERY BY DECK', style: kMonoLabel)),
+            Text('AVG: ${(avgMastery * 100).round()}%', style: kMonoLabel),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: _MasteryChart(
+            labels: [for (final d in decks) d.title],
+            values: [for (final d in decks) stats[d.id]?.mastery ?? 0.0],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The three lowest-mastery cards and the button that drills them.
+class _WeakestSection extends ConsumerWidget {
+  final List<Flashcard> cards;
+
+  const _WeakestSection({required this.cards});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weakest = ([
+      ...cards,
+    ]..sort((a, b) => a.mastery.compareTo(b.mastery))).take(3).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('WEAKEST CARDS', style: kMonoLabel),
+        const SizedBox(height: 8),
+        for (final card in weakest)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(child: Text(card.question)),
+                const PillLabel('WEAK'),
+              ],
+            ),
+          ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () {
+              // Loads the queue in the background; the Review tab shows its
+              // own loading and error states.
+              unawaited(ref.read(reviewProvider.notifier).startWeak());
+              ref.read(tabIndexProvider.notifier).set(2);
+            },
+            child: Text('Drill ${weakest.length} weak cards now'),
           ),
         ),
       ],

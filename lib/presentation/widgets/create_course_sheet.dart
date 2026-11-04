@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../core/dates.dart';
-import '../providers/library_provider.dart';
-import '../theme/app_theme.dart';
-import '../utils/format.dart';
+import '../../application/core_providers.dart';
+import '../../application/library.dart';
+import '../../core/dates.dart';
+import '../../theme/app_theme.dart';
+import '../format.dart';
+import '../save_feedback.dart';
 
 Future<void> showCreateCourseSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -28,6 +30,7 @@ class _CreateCourseSheetState extends ConsumerState<_CreateCourseSheet> {
   final _titleController = TextEditingController();
   final _dateController = TextEditingController();
   DateTime? _examDate;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -37,7 +40,7 @@ class _CreateCourseSheetState extends ConsumerState<_CreateCourseSheet> {
   }
 
   Future<void> _pickDate() async {
-    final today = dateOnly(DateTime.now());
+    final today = dateOnly(ref.read(clockProvider).now());
     final picked = await showDatePicker(
       context: context,
       initialDate: _examDate ?? today.add(const Duration(days: 14)),
@@ -52,13 +55,27 @@ class _CreateCourseSheetState extends ConsumerState<_CreateCourseSheet> {
     }
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    ref.read(coursesProvider.notifier).add(
-          title: _titleController.text.trim(),
-          examDate: _examDate!,
-        );
-    Navigator.pop(context);
+  Future<void> _save() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final commands = ref.read(libraryCommandsProvider);
+    final navigator = Navigator.of(context);
+    final saved = await runSave(
+      context,
+      ref,
+      () => commands.createCourse(
+        title: _titleController.text,
+        examDate: _examDate!,
+      ),
+    );
+    // The sheet may have been dismissed while saving; then there is nothing
+    // left to close or re-enable.
+    if (!mounted) return;
+    if (saved) {
+      navigator.pop();
+    } else {
+      setState(() => _saving = false);
+    }
   }
 
   @override
@@ -111,7 +128,10 @@ class _CreateCourseSheetState extends ConsumerState<_CreateCourseSheet> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(onPressed: _save, child: const Text('Save Course')),
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: const Text('Save Course'),
+              ),
             ),
             const SizedBox(height: 8),
             SizedBox(
