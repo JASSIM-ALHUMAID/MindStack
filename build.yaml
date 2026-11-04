@@ -8,3 +8,4 @@ targets:
         generate_for:
           include:
             - lib/data/database/app_database.dart
+            - lib/data/database/tables.dart
