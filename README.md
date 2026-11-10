@@ -21,7 +21,7 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 
 - **Navigation:** bottom bar with Inbox, Library, Review, Quiz and Stats. The app opens on Library. Deck Editor is pushed with go_router (`/deck/:deckId`); Android back from another tab returns to Library.
 - **Library:** courses with days to exam, decks with card count and mastery. + Course opens the Create Course sheet (title and exam date, with validation). + Deck on a course opens the Create Deck sheet and then the new deck.
-- **Deck Editor:** card list, Add Card sheet with validation, delete a card (Edit is a placeholder), Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
+- **Deck Editor:** card list, Add Card and Edit Card sheets with validation (editing keeps the card's schedule), delete a card with a confirmation and Undo, Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
 - **Inbox:** draft cards with source pills and checkmarks, CLEAR, and Save selected → Choose deck sheet, which saves the ticked drafts as cards. Screenshots, PDF, Import a shared deck and EDIT are placeholders.
 - **Review:** refreshed due-card queue, deck filtering, saved ratings and review logs, and session summaries showing count, time, pace and next due date.
 - **Settings:** TTS toggle and reminder time are saved with shared_preferences and restored at startup.
@@ -34,7 +34,7 @@ Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite d
 
 - Review again repeats the previous queue. Timing does not pause while the app is in the background.
 - Quiz misses are not logged yet; the quiz still asks sample questions and the Stats streak is placeholder history.
-- Card editing, draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
+- Draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
 - TTS and reminder settings persist, but speech and reminder notifications are not implemented yet.
 
 ## Phase 3 workflow
@@ -68,7 +68,7 @@ lib/
   application/                 Riverpod providers, command classes, startup, review and quiz notifiers
   presentation/                format.dart, save_feedback.dart
     screens/                   app_shell, library, deck_editor, inbox, review, quiz, stats
-    widgets/                   app_gate, async_value_view, common, create_course_sheet, create_deck_sheet, add_card_sheet
+    widgets/                   app_gate, async_value_view, common, create_course_sheet, create_deck_sheet, add_card_sheet (shared CardForm), edit_card_sheet, confirm_delete_dialog
 assets/fonts/                  Newsreader, Inter, JetBrains Mono + licenses
 test/
   domain/ data/                unit tests, and repository tests on an in-memory database
