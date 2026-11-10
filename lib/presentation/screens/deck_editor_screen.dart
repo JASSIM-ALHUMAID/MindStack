@@ -332,6 +332,8 @@ class _CardTileState extends ConsumerState<_CardTile> {
     messenger.showSnackBar(
       SnackBar(
         content: const Text('Card deleted'),
+        // Flutter keeps a SnackBar with an action open until tapped.
+        persist: false,
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () => unawaited(
