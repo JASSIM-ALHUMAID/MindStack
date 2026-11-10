@@ -39,6 +39,13 @@ final class InboxCommands {
   /// Throws [StorageFailure] if the write fails.
   Future<void> clear() => _ref.read(draftRepositoryProvider).clear();
 
+  Future<void> deleteDraft(String id) =>
+      _ref.read(draftRepositoryProvider).delete([id]);
+
+  /// Undoes [deleteDraft]. The draft returns at the end of the list.
+  Future<void> restoreDraft(DraftCard draft) =>
+      _ref.read(draftRepositoryProvider).insertAll([draft]);
+
   /// Throws [InvalidInput] for a blank question or answer and [NotFound] if
   /// the draft is gone.
   Future<void> updateDraft({

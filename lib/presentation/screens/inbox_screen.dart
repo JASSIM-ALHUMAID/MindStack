@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../application/deck_import.dart';
 import '../../application/inbox.dart';
 import '../../application/library.dart';
+import '../../application/services.dart';
 import '../../domain/mindstack_file.dart';
 import '../../domain/models/deck.dart';
 import '../../domain/models/draft_card.dart';
@@ -41,6 +42,45 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
   /// True while CLEAR or "Save selected" is writing, so neither can be
   /// started twice.
   bool _busy = false;
+
+  /// Swiped drafts, hidden at once: a dismissed tile must leave the tree
+  /// before the database stream catches up.
+  final _hidden = <String>{};
+
+  @override
+  void didUpdateWidget(_InboxContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Once a deletion is stored the id is gone; forget it so Undo shows it.
+    _hidden.retainWhere((id) => widget.drafts.any((d) => d.id == id));
+  }
+
+  Future<void> _deleteDraft(DraftCard draft) async {
+    setState(() => _hidden.add(draft.id));
+    final commands = ref.read(inboxCommandsProvider);
+    // Captured now: Undo is tapped after this screen may have rebuilt.
+    final messenger = ScaffoldMessenger.of(context);
+    final logger = ref.read(loggerProvider);
+    final ok = await runSaveWith(
+      messenger,
+      logger,
+      () => commands.deleteDraft(draft.id),
+    );
+    if (!ok) {
+      if (mounted) setState(() => _hidden.remove(draft.id));
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Draft deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => unawaited(
+            runSaveWith(messenger, logger, () => commands.restoreDraft(draft)),
+          ),
+        ),
+      ),
+    );
+  }
 
   void _notImplemented(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -123,7 +163,10 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
 
   @override
   Widget build(BuildContext context) {
-    final drafts = widget.drafts;
+    final drafts = [
+      for (final d in widget.drafts)
+        if (!_hidden.contains(d.id)) d,
+    ];
     final selectedCount = drafts.where((d) => d.selected).length;
     final ocrProgress = ref.watch(ocrProgressProvider);
     final importState = ref.watch(deckImportProvider);
@@ -204,7 +247,13 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
           ),
         ),
         const SizedBox(height: 20),
-        const Text('Draft cards', style: kSerifSection),
+        Row(
+          children: [
+            const Expanded(child: Text('Draft cards', style: kSerifSection)),
+            if (drafts.isNotEmpty)
+              const Text('SWIPE LEFT TO DELETE', style: kMonoMicro),
+          ],
+        ),
         const SizedBox(height: 8),
         if (drafts.isEmpty && !reading)
           SoftCard(
@@ -218,7 +267,13 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
             ),
           ),
         for (final draft in drafts) ...[
-          _DraftTile(key: ValueKey(draft.id), draft: draft),
+          Dismissible(
+            key: ValueKey(draft.id),
+            direction: DismissDirection.endToStart,
+            background: const _DeleteBackground(),
+            onDismissed: (_) => unawaited(_deleteDraft(draft)),
+            child: _DraftTile(draft: draft),
+          ),
           const SizedBox(height: 12),
         ],
         if (reading)
@@ -241,7 +296,7 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
 class _DraftTile extends ConsumerStatefulWidget {
   final DraftCard draft;
 
-  const _DraftTile({super.key, required this.draft});
+  const _DraftTile({required this.draft});
 
   @override
   ConsumerState<_DraftTile> createState() => _DraftTileState();
@@ -389,6 +444,30 @@ class _DraftSkeleton extends StatelessWidget {
             bar(double.infinity, 10),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DeleteBackground extends StatelessWidget {
+  const _DeleteBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.danger,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.trash2, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('Delete', style: TextStyle(color: Colors.white)),
+        ],
       ),
     );
   }

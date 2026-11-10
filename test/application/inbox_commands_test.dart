@@ -185,6 +185,25 @@ void main() {
     );
   });
 
+  test('deleteDraft removes one draft; restoreDraft brings it back', () async {
+    final container = makeContainer();
+    await container.read(draftRepositoryProvider).insertAll([
+      _draft('a'),
+      _draft('b', selected: false),
+      _draft('c'),
+    ]);
+    final inbox = container.read(inboxCommandsProvider);
+
+    await inbox.deleteDraft('b');
+    var drafts = await container.read(draftsProvider.future);
+    expect([for (final d in drafts) d.id], ['a', 'c']);
+
+    await inbox.restoreDraft(_draft('b', selected: false));
+    drafts = await container.read(draftRepositoryProvider).watchAll().first;
+    expect([for (final d in drafts) d.id], ['a', 'c', 'b']);
+    expect(drafts.last.selected, isFalse);
+  });
+
   group('updateDraft', () {
     test('trims and saves the text, keeps the tick', () async {
       final container = makeContainer();

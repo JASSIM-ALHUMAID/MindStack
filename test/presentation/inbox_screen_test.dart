@@ -184,6 +184,45 @@ void main() {
     });
   });
 
+  testWidgets('swiping a draft deletes it and Undo restores it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final container = makeContainer();
+    await container.read(draftRepositoryProvider).insertAll([
+      for (final id in ['d1', 'd2'])
+        DraftCard(
+          id: id,
+          source: CardSource.shared,
+          sourceRef: 'Deck',
+          question: 'Question $id',
+          answer: 'Answer $id',
+        ),
+    ]);
+    await pumpInApp(tester, container, const InboxScreen());
+    await tester.pumpAndSettle();
+    expect(find.text('Save selected (2) to a deck'), findsOneWidget);
+
+    await tester.drag(find.text('Question d1'), const Offset(-600, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Question d1'), findsNothing);
+    expect(find.text('Draft deleted'), findsOneWidget);
+    expect(find.text('Save selected (1) to a deck'), findsOneWidget);
+    var stored = await container.read(draftsProvider.future);
+    expect([for (final d in stored) d.id], ['d2']);
+
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Question d1'), findsOneWidget);
+    expect(find.text('Save selected (2) to a deck'), findsOneWidget);
+    stored = await container.read(draftsProvider.future);
+    expect(stored, hasLength(2));
+  });
+
   testWidgets('EDIT validates and saves the draft text', (tester) async {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1.0;
