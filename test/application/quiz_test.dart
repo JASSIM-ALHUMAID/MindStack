@@ -18,7 +18,7 @@ ProviderContainer _container({FixedClock? clock}) => makeContainer(
   overrides: [quizRandomProvider.overrideWithValue(Random(1))],
 );
 
-/// Adds a deck with [count] cards Q1/A1, Q2/A2, ... (Q<prefix>1 with a
+/// Adds a deck with [count] cards Q1/A1, Q2/A2, ... (`Q${prefix}1` with a
 /// [prefix]); returns the card ids.
 Future<List<String>> _cards(
   ProviderContainer container,
