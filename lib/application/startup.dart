@@ -32,7 +32,9 @@ final appStartupProvider = FutureProvider<void>((ref) async {
 /// Retries a failed startup: returns a callback that discards the current
 /// database so a fresh one is opened and [appStartupProvider] runs again.
 /// Presentation calls this instead of reaching for the database provider.
-final startupRetryProvider = Provider<void Function()>((ref) => () {
-  ref.invalidate(sharedPreferencesProvider);
-  ref.invalidate(databaseProvider);
-});
+final startupRetryProvider = Provider<void Function()>(
+  (ref) => () {
+    ref.invalidate(sharedPreferencesProvider);
+    ref.invalidate(databaseProvider);
+  },
+);

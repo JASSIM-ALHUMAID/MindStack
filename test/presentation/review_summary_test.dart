@@ -168,11 +168,7 @@ void main() {
     _viewport(tester);
     final c = _container(
       _ReviewStub(
-        const ReviewState(
-          cardIds: ['first', 'second'],
-          index: 2,
-          sessionId: 1,
-        ),
+        const ReviewState(cardIds: ['first', 'second'], index: 2, sessionId: 1),
       ),
     );
     await pumpInApp(tester, c, const ReviewScreen());

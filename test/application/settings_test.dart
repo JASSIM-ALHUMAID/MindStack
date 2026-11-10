@@ -64,22 +64,25 @@ void main() {
     expect(second.read(settingsProvider).reminderMinutes, 1110);
   });
 
-  test('invalid reminder times are rejected without changing the saved value', () async {
-    final container = await _openSettings();
-    final settings = container.read(settingsProvider.notifier);
-    await settings.setReminderMinutes(600);
+  test(
+    'invalid reminder times are rejected without changing the saved value',
+    () async {
+      final container = await _openSettings();
+      final settings = container.read(settingsProvider.notifier);
+      await settings.setReminderMinutes(600);
 
-    for (final invalid in [-1, 1440]) {
-      await expectLater(
-        settings.setReminderMinutes(invalid),
-        throwsA(isA<InvalidInput>()),
-      );
-    }
+      for (final invalid in [-1, 1440]) {
+        await expectLater(
+          settings.setReminderMinutes(invalid),
+          throwsA(isA<InvalidInput>()),
+        );
+      }
 
-    expect(container.read(settingsProvider).reminderMinutes, 600);
-    final reopened = await _openSettings();
-    expect(reopened.read(settingsProvider).reminderMinutes, 600);
-  });
+      expect(container.read(settingsProvider).reminderMinutes, 600);
+      final reopened = await _openSettings();
+      expect(reopened.read(settingsProvider).reminderMinutes, 600);
+    },
+  );
 
   test('two rapid toggles persist off without losing either update', () async {
     final container = await _openSettings();
@@ -112,16 +115,19 @@ void main() {
     expect(preferences.get('ttsEnabled'), isTrue);
   });
 
-  test('wrong types and out-of-range stored values fall back to defaults', () async {
-    SharedPreferences.setMockInitialValues({
-      'ttsEnabled': 'invalid',
-      'reminderMinutes': 2000,
-    });
-    final container = await _openSettings();
+  test(
+    'wrong types and out-of-range stored values fall back to defaults',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'ttsEnabled': 'invalid',
+        'reminderMinutes': 2000,
+      });
+      final container = await _openSettings();
 
-    expect(container.read(settingsProvider).ttsEnabled, isFalse);
-    expect(container.read(settingsProvider).reminderMinutes, 480);
-  });
+      expect(container.read(settingsProvider).ttsEnabled, isFalse);
+      expect(container.read(settingsProvider).reminderMinutes, 480);
+    },
+  );
 
   test('app startup loads saved settings before completing', () async {
     final container = makeContainer(
