@@ -25,7 +25,7 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 - **Inbox:** draft cards with source pills and checkmarks, CLEAR, and Save selected → Choose deck sheet, which saves the ticked drafts as cards. Screenshots, PDF, Import a shared deck and EDIT are placeholders.
 - **Review:** refreshed due-card queue, deck filtering, saved ratings and review logs, and session summaries showing count, time, pace and next due date.
 - **Settings:** TTS toggle and reminder time are saved with shared_preferences and restored at startup.
-- **Quiz:** five sample questions, correct and wrong answer feedback with an explanation, results with accuracy and the questions missed, Review weak cards.
+- **Quiz:** up to five multiple-choice questions built from your stored cards (the right answer plus three answers from other cards, same deck first). A wrong answer is logged as "Again" for that card, so it is due in the next review. Results show score, accuracy, seconds per question and the missed cards; Review weak cards studies exactly those. With fewer than 4 cards the Quiz tab explains that more cards are needed. The quiz is rebuilt when the tab opens unless one is in progress.
 - **Stats:** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
 
 Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. Review takes a fresh queue snapshot when a session starts and reads each current card live; it does not reorder the queue during a session.
@@ -33,7 +33,7 @@ Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite d
 ### Known limitations (Phase 3 work)
 
 - Review again repeats the previous queue. Timing does not pause while the app is in the background.
-- Quiz misses are not logged yet; the quiz still asks sample questions and the Stats streak is placeholder history.
+- The Stats streak is placeholder history.
 - Card editing, draft editing, importing screenshots, PDFs or a shared deck, and sharing a deck show an "arrives in Phase 3" message.
 - TTS and reminder settings persist, but speech and reminder notifications are not implemented yet.
 
@@ -58,7 +58,7 @@ lib/
   route_names.dart             route paths
   theme/app_theme.dart         Material 3 theme, colors and fonts from Figma
   core/                        clock, ids, logger, dates (no app imports)
-  domain/                      enums, failures, scheduler, repository interfaces
+  domain/                      enums, failures, scheduler, quiz builder, repository interfaces
     models/                    Course, Deck, DeckStats, Flashcard, DraftCard, ReviewLog, ReviewResult, QuizQuestion
   data/                        drift implementation of the domain interfaces
     database/                  AppDatabase, tables, converters, generated app_database.g.dart
