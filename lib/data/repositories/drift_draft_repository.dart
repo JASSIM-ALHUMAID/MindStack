@@ -51,6 +51,19 @@ final class DriftDraftRepository implements DraftRepository {
   });
 
   @override
+  Future<void> updateText(
+    String id, {
+    required String question,
+    required String answer,
+  }) => guard(() async {
+    final changed =
+        await (_db.update(_db.draftCards)..where((t) => t.id.equals(id))).write(
+          DraftCardsCompanion(question: Value(question), answer: Value(answer)),
+        );
+    if (changed == 0) throw NotFound(entity: 'draft', id: id);
+  });
+
+  @override
   Future<void> delete(Iterable<String> ids) => guard(() async {
     await (_db.delete(_db.draftCards)..where((t) => t.id.isIn(ids))).go();
   });

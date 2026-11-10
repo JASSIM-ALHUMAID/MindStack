@@ -57,6 +57,26 @@ void main() {
     );
   });
 
+  test('updateText changes only question and answer', () async {
+    await repo.insertAll([_draft('a', selected: false)]);
+
+    await repo.updateText('a', question: 'New Q', answer: 'New A');
+
+    final updated = (await repo.watchAll().first).single;
+    expect(updated.question, 'New Q');
+    expect(updated.answer, 'New A');
+    expect(updated.selected, isFalse);
+    expect(updated.source, CardSource.slide);
+    expect(updated.sourceRef, 'Page 1');
+  });
+
+  test('updateText unknown id throws NotFound', () async {
+    await expectLater(
+      repo.updateText('missing', question: 'Q', answer: 'A'),
+      throwsA(isA<NotFound>().having((f) => f.entity, 'entity', 'draft')),
+    );
+  });
+
   test('selected returns only ticked drafts', () async {
     await repo.insertAll([_draft('a'), _draft('b', selected: false)]);
     expect(await repo.selected(), [_draft('a')]);

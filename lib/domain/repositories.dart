@@ -83,6 +83,14 @@ abstract interface class DraftRepository {
   /// Flips the selection of draft [id]. Throws `NotFound` if missing.
   Future<void> toggleSelected(String id);
 
+  /// Writes only the text, so a concurrent tick is never overwritten.
+  /// Throws `NotFound` if missing.
+  Future<void> updateText(
+    String id, {
+    required String question,
+    required String answer,
+  });
+
   /// Deletes the drafts with the given [ids].
   Future<void> delete(Iterable<String> ids);
 

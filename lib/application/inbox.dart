@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/enums.dart';
 import '../domain/failures.dart';
+import '../domain/mindstack_file.dart';
 import '../domain/models/draft_card.dart';
 import '../domain/models/flashcard.dart';
 import 'core_providers.dart';
 import 'services.dart';
+import 'validation.dart';
 
 /// Live list of OCR drafts awaiting a decision.
 final draftsProvider = StreamProvider<List<DraftCard>>(
@@ -35,6 +38,50 @@ final class InboxCommands {
   ///
   /// Throws [StorageFailure] if the write fails.
   Future<void> clear() => _ref.read(draftRepositoryProvider).clear();
+
+  /// Throws [InvalidInput] for a blank question or answer and [NotFound] if
+  /// the draft is gone.
+  Future<void> updateDraft({
+    required String id,
+    required String question,
+    required String answer,
+  }) async {
+    final q = requireText(
+      question,
+      field: 'question',
+      reason: 'Enter a question.',
+    );
+    final a = requireText(answer, field: 'answer', reason: 'Enter an answer.');
+    await _ref
+        .read(draftRepositoryProvider)
+        .updateText(id, question: q, answer: a);
+  }
+
+  /// Adds every card of a `.mindstack` file as a ticked draft and returns the
+  /// parsed deck.
+  ///
+  /// Throws [InvalidInput] with the reason the file is unreadable; no drafts
+  /// are added then.
+  Future<MindstackFile> importDeck(String fileText) async {
+    final MindstackFile deck;
+    try {
+      deck = MindstackFile.parse(fileText);
+    } on FormatException catch (e) {
+      throw InvalidInput(field: 'file', reason: e.message);
+    }
+    final ids = _ref.read(idGeneratorProvider);
+    await _ref.read(draftRepositoryProvider).insertAll([
+      for (final c in deck.cards)
+        DraftCard(
+          id: ids.newId(),
+          source: CardSource.shared,
+          sourceRef: deck.deckTitle,
+          question: c.question,
+          answer: c.answer,
+        ),
+    ]);
+    return deck;
+  }
 
   /// Turns the ticked drafts into cards in [deckId], due now, and deletes
   /// those drafts, in one transaction. Returns the number saved.

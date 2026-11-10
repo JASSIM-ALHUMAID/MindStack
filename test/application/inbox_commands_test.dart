@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mindstack/application/cards.dart';
@@ -32,6 +34,13 @@ final class _FailingDeleteDrafts implements DraftRepository {
   Future<void> toggleSelected(String id) => _inner.toggleSelected(id);
 
   @override
+  Future<void> updateText(
+    String id, {
+    required String question,
+    required String answer,
+  }) => _inner.updateText(id, question: question, answer: answer);
+
+  @override
   Future<void> delete(Iterable<String> ids) async =>
       throw StorageFailure(StateError('disk full'), StackTrace.current);
 
@@ -40,6 +49,9 @@ final class _FailingDeleteDrafts implements DraftRepository {
 }
 
 final _now = DateTime(2026, 11, 4, 12);
+
+String _fixture(String path) =>
+    File('test/fixtures/mindstack/$path').readAsStringSync();
 
 DraftCard _draft(String id, {bool selected = true}) => DraftCard(
   id: id,
@@ -170,6 +182,118 @@ void main() {
     expect(
       await container.read(draftRepositoryProvider).selected(),
       hasLength(1),
+    );
+  });
+
+  group('updateDraft', () {
+    test('trims and saves the text, keeps the tick', () async {
+      final container = makeContainer();
+      await container.read(draftRepositoryProvider).insertAll([
+        _draft('a', selected: false),
+      ]);
+
+      await container
+          .read(inboxCommandsProvider)
+          .updateDraft(id: 'a', question: '  New Q ', answer: ' New A  ');
+
+      final draft = (await container.read(draftsProvider.future)).single;
+      expect((draft.question, draft.answer), ('New Q', 'New A'));
+      expect(draft.selected, isFalse);
+    });
+
+    test('blank question throws InvalidInput and changes nothing', () async {
+      final container = makeContainer();
+      await container.read(draftRepositoryProvider).insertAll([_draft('a')]);
+
+      await expectLater(
+        container
+            .read(inboxCommandsProvider)
+            .updateDraft(id: 'a', question: '   ', answer: 'New A'),
+        throwsA(
+          isA<InvalidInput>().having(
+            (e) => e.userMessage,
+            'userMessage',
+            'Enter a question.',
+          ),
+        ),
+      );
+      expect((await container.read(draftsProvider.future)).single, _draft('a'));
+    });
+
+    test('missing draft throws NotFound', () async {
+      final container = makeContainer();
+
+      await expectLater(
+        container
+            .read(inboxCommandsProvider)
+            .updateDraft(id: 'gone', question: 'Q', answer: 'A'),
+        throwsA(isA<NotFound>()),
+      );
+    });
+  });
+
+  group('importDeck', () {
+    test(
+      'adds each card as a ticked shared draft after existing ones',
+      () async {
+        final container = makeContainer();
+        await container.read(draftRepositoryProvider).insertAll([
+          _draft('old'),
+        ]);
+
+        final deck = await container
+            .read(inboxCommandsProvider)
+            .importDeck(_fixture('valid/01_flutter_widgets.mindstack'));
+
+        expect(deck.deckTitle, 'Flutter Widgets');
+        final drafts = await container.read(draftsProvider.future);
+        expect(drafts, hasLength(6));
+        expect(drafts.first.id, 'old');
+        final imported = drafts.skip(1).toList();
+        expect(imported.first.question, 'What is a Widget?');
+        for (final d in imported) {
+          expect(d.source, CardSource.shared);
+          expect(d.sourceRef, 'Flutter Widgets');
+          expect(d.selected, isTrue);
+        }
+        expect({for (final d in imported) d.id}, hasLength(5));
+      },
+    );
+
+    test('importing the same file twice keeps both copies', () async {
+      final container = makeContainer();
+      final inbox = container.read(inboxCommandsProvider);
+      final text = _fixture('valid/04_single_card.mindstack');
+
+      await inbox.importDeck(text);
+      await inbox.importDeck(text);
+
+      expect(await container.read(draftsProvider.future), hasLength(2));
+    });
+
+    test(
+      'a bad file throws InvalidInput with the reason, adds nothing',
+      () async {
+        final container = makeContainer();
+        await container.read(draftRepositoryProvider).insertAll([_draft('a')]);
+
+        await expectLater(
+          container
+              .read(inboxCommandsProvider)
+              .importDeck(
+                _fixture('invalid/bad_05_card_missing_answer.mindstack'),
+              ),
+          throwsA(
+            isA<InvalidInput>().having(
+              (e) => e.userMessage,
+              'userMessage',
+              'Card 1 has no answer.',
+            ),
+          ),
+        );
+        final drafts = await container.read(draftsProvider.future);
+        expect([for (final d in drafts) d.id], ['a']);
+      },
     );
   });
 
