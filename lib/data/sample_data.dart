@@ -4,7 +4,6 @@ import '../domain/models/course.dart';
 import '../domain/models/deck.dart';
 import '../domain/models/draft_card.dart';
 import '../domain/models/flashcard.dart';
-import '../domain/models/quiz_question.dart';
 import 'seed.dart';
 
 /// Builds the sample library that [seedIfNeeded] stores on first launch, so
@@ -171,66 +170,3 @@ SeedData buildSampleData(DateTime now) {
 
   return SeedData(courses: courses, decks: decks, cards: cards, drafts: drafts);
 }
-
-const List<QuizQuestion> sampleQuiz = [
-  QuizQuestion(
-    id: 'q1',
-    prompt: 'A widget is best described as:',
-    options: [
-      'A mutable object',
-      'An immutable configuration',
-      'A native view',
-      'A database row',
-    ],
-    correctIndex: 1,
-    explanation: 'Widgets are immutable descriptions of part of the UI.',
-  ),
-  QuizQuestion(
-    id: 'q2',
-    prompt: 'setState() does what?',
-    options: [
-      'Saves to disk',
-      'Marks state dirty and schedules a rebuild',
-      'Creates a route',
-      'Closes the app',
-    ],
-    correctIndex: 1,
-    explanation: 'It tells the framework to call build() again.',
-  ),
-  QuizQuestion(
-    id: 'q3',
-    prompt: 'Hot reload injects code into:',
-    options: [
-      'A new VM',
-      'The running Dart VM',
-      'The native binary',
-      'A web server',
-    ],
-    correctIndex: 1,
-    explanation: 'Hot reload pushes changed source into the running Dart VM and rebuilds the widget tree.',
-  ),
-  QuizQuestion(
-    id: 'q4',
-    prompt: 'Navigator.push() does:',
-    options: [
-      'Removes the top route',
-      'Adds a route to the stack',
-      'Replaces the app',
-      'Clears all routes',
-    ],
-    correctIndex: 1,
-    explanation: 'push adds a route on top of the stack; pop removes it.',
-  ),
-  QuizQuestion(
-    id: 'q5',
-    prompt: 'BuildContext is:',
-    options: [
-      'A handle to a location in the element tree',
-      'A theme',
-      'A network client',
-      'A state object',
-    ],
-    correctIndex: 0,
-    explanation: 'It identifies where a widget sits in the element tree.',
-  ),
-];

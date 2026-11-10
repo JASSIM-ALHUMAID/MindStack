@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../application/quiz.dart';
 import '../../application/review.dart';
 import '../../application/tab.dart';
 import 'inbox_screen.dart';
@@ -45,6 +46,11 @@ class AppShell extends ConsumerWidget {
             // those programmatic switches must not replace their selection.
             if (i == 2 && index != 2) {
               unawaited(ref.read(reviewProvider.notifier).start());
+            }
+            // A quiz in progress is kept; otherwise it is rebuilt so cards
+            // added or deleted since it was built are used.
+            if (i == 3 && index != 3) {
+              ref.read(quizProvider.notifier).refreshIfIdle();
             }
             ref.read(tabIndexProvider.notifier).set(i);
           },

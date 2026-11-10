@@ -7,7 +7,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../application/quiz.dart';
 import '../../application/review.dart';
 import '../../application/tab.dart';
+import '../../domain/quiz_builder.dart';
 import '../../theme/app_theme.dart';
+import '../save_feedback.dart';
+import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
 
 class QuizScreen extends ConsumerWidget {
@@ -15,11 +18,68 @@ class QuizScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final quiz = ref.watch(quizProvider);
+    final value = ref.watch(quizProvider);
+    final quiz = value.valueOrNull;
+    // A rebuild (Try again, or entering the tab) keeps showing the previous
+    // quiz until the new one is ready; only the very first load spins.
+    if (quiz == null) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          const ScreenHeader(eyebrow: 'MULTIPLE CHOICE', title: 'Quiz'),
+          const SizedBox(height: 16),
+          AsyncValueView<QuizState>(
+            value: value,
+            data: (_) => const SizedBox(),
+          ),
+        ],
+      );
+    }
     final total = quiz.questions.length;
 
+    if (total == 0) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          const ScreenHeader(eyebrow: 'MULTIPLE CHOICE', title: 'Quiz'),
+          const SizedBox(height: 16),
+          SoftCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Icon(
+                  LucideIcons.circleQuestionMark,
+                  color: AppColors.primary,
+                  size: 32,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Add at least $kMinQuizCards cards to start a quiz',
+                  textAlign: TextAlign.center,
+                  style: kSerifSection,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Each question needs three wrong answers taken from '
+                  'your other cards.',
+                  textAlign: TextAlign.center,
+                  style: kBodySmall,
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => ref.read(tabIndexProvider.notifier).set(1),
+                  child: const Text('Go to Library'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     if (quiz.finished) {
-      final accuracy = total == 0 ? 0 : (quiz.score * 100 / total).round();
+      final accuracy = (quiz.score * 100 / total).round();
+      final missedIds = quiz.missedCardIds;
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
@@ -66,7 +126,7 @@ class QuizScreen extends ConsumerWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: total == 0 ? 0 : quiz.score / total,
+                    value: quiz.score / total,
                     minHeight: 6,
                     color: AppColors.primary,
                     backgroundColor: AppColors.chip,
@@ -85,14 +145,35 @@ class QuizScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          SoftCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('ACCURACY', style: kMonoLabel),
-                Text('$accuracy%', style: kSerifSection),
-              ],
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: SoftCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('ACCURACY', style: kMonoLabel),
+                      Text('$accuracy%', style: kSerifSection),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SoftCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('CADENCE', style: kMonoLabel),
+                      Text(
+                        '${quiz.secondsPerQuestion.round()}s / question',
+                        style: kSerifSection,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           SoftCard(
@@ -133,21 +214,50 @@ class QuizScreen extends ConsumerWidget {
                     style: kBodySmall,
                   ),
                 ],
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    // Loads the queue in the background; the Review tab shows its own
-                    // loading and error states.
-                    unawaited(ref.read(reviewProvider.notifier).startWeak());
-                    ref.read(tabIndexProvider.notifier).set(2);
-                  },
-                  iconAlignment: IconAlignment.end,
-                  icon: const Icon(LucideIcons.arrowRight, size: 16),
-                  label: const Text('REVIEW WEAK CARDS', style: kMonoLabel),
-                ),
+                if (missedIds.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      // Loads the queue in the background; the Review tab
+                      // shows its own loading and error states.
+                      unawaited(
+                        ref
+                            .read(reviewProvider.notifier)
+                            .start(cardIds: missedIds),
+                      );
+                      ref.read(tabIndexProvider.notifier).set(2);
+                    },
+                    iconAlignment: IconAlignment.end,
+                    icon: const Icon(LucideIcons.arrowRight, size: 16),
+                    label: const Text('REVIEW WEAK CARDS', style: kMonoLabel),
+                  ),
+                ],
               ],
             ),
           ),
+          if (missedIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SoftCard(
+              color: AppColors.chip,
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.bookmark,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Missed cards were marked "Again", so they are due in '
+                      'your next review.',
+                      style: kBodySmall.copyWith(color: AppColors.ink),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       );
     }
@@ -205,9 +315,17 @@ class QuizScreen extends ConsumerWidget {
                             : (i == quiz.selected
                                   ? _OptionState.wrong
                                   : _OptionState.idle)),
+                  // The answer shows at once; a failed miss log is reported
+                  // in a SnackBar and the quiz carries on.
                   onTap: answered
                       ? null
-                      : () => ref.read(quizProvider.notifier).select(i),
+                      : () => unawaited(
+                          runSave(
+                            context,
+                            ref,
+                            () => ref.read(quizProvider.notifier).select(i),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 8),
               ],
