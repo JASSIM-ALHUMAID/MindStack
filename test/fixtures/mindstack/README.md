@@ -28,8 +28,11 @@ bad_01 not JSON, bad_02 empty file, bad_03 no `cards` key, bad_04 empty `cards`,
 
 ## Manual testing on the emulator
 
+Drag a file from File Explorer (not VS Code) onto the emulator; it lands in Downloads. Or use adb, then re-index so the picker sees the files:
+
 ```bash
 adb push test/fixtures/mindstack/valid/. /sdcard/Download/
+adb shell content call --uri content://media --method scan_volume --arg external_primary
 ```
 
 Then open the Inbox tab, tap **Import a shared deck**, and pick a file from Downloads.
