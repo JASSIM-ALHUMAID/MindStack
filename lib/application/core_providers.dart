@@ -6,12 +6,14 @@ import 'package:path_provider/path_provider.dart';
 
 import '../data/database/app_database.dart';
 import '../data/drift_transaction_runner.dart';
+import '../data/platform_deck_file_picker.dart';
 import '../data/repositories/drift_card_repository.dart';
 import '../data/repositories/drift_draft_repository.dart';
 import '../data/repositories/drift_library_repository.dart';
 import '../data/repositories/drift_review_log_repository.dart';
 import '../data/sample_data.dart';
 import '../data/seed.dart';
+import '../domain/deck_file_picker.dart';
 import '../domain/repositories.dart';
 import 'services.dart';
 
@@ -63,4 +65,8 @@ final reviewLogRepositoryProvider = Provider<ReviewLogRepository>(
 /// Runs several repository calls as one atomic unit.
 final transactionRunnerProvider = Provider<TransactionRunner>(
   (ref) => DriftTransactionRunner(ref.watch(databaseProvider)),
+);
+
+final deckFilePickerProvider = Provider<DeckFilePicker>(
+  (ref) => const PlatformDeckFilePicker(),
 );

@@ -1,6 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:mindstack/core/clock.dart';
 import 'package:mindstack/core/ids.dart';
 import 'package:mindstack/core/logger.dart';
+import 'package:mindstack/domain/deck_file_picker.dart';
 
 /// A [Clock] frozen at a chosen instant that tests can move forward.
 final class FixedClock implements Clock {
@@ -42,5 +48,53 @@ final class RecordingLogger implements AppLogger {
   @override
   void error(String message, Object error, StackTrace stack) {
     errors.add((message: message, error: error, stack: stack));
+  }
+}
+
+/// A picked file with fixed contents. Set [failReads] to make the next reads
+/// throw, and [gate] to hold a read until it completes.
+final class FakeDeckFile implements PickedDeckFile {
+  FakeDeckFile(this.bytes, {this.reportedLength});
+
+  FakeDeckFile.text(String text) : this(utf8.encode(text));
+
+  FakeDeckFile.fixture(String path)
+    : this(File('test/fixtures/mindstack/$path').readAsBytesSync());
+
+  final List<int> bytes;
+  final int? reportedLength;
+  int failReads = 0;
+  Completer<void>? gate;
+  int reads = 0;
+
+  @override
+  Future<int?> length() async => reportedLength ?? bytes.length;
+
+  @override
+  Future<Uint8List> readAsBytes() async {
+    reads++;
+    await gate?.future;
+    if (failReads > 0) {
+      failReads--;
+      throw const FileSystemException('read failed');
+    }
+    return Uint8List.fromList(bytes);
+  }
+}
+
+/// Returns the queued files in order; null means the user cancelled.
+final class FakeDeckFilePicker implements DeckFilePicker {
+  FakeDeckFilePicker([List<PickedDeckFile?> files = const []])
+    : _files = [...files];
+
+  final List<PickedDeckFile?> _files;
+  int picks = 0;
+
+  void queue(PickedDeckFile? file) => _files.add(file);
+
+  @override
+  Future<PickedDeckFile?> pick() async {
+    picks++;
+    return _files.isEmpty ? null : _files.removeAt(0);
   }
 }
