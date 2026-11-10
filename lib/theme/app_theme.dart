@@ -7,6 +7,11 @@ class AppColors {
   static const Color background = Color(0xFFFBF6EE);
   static const Color card = Color(0xFFFFFDF8);
   static const Color primary = Color(0xFF9B5B32); // accent/default
+  // Darker accent for small text on tinted pills: 5.5:1 on the pill fill,
+  // where [primary] measured 4.5:1 on cards and 4.2:1 on the background.
+  static const Color primaryInk = Color(0xFF8A4F2A);
+  // Inactive bottom-navigation icons and labels: 5.8:1 on the bar.
+  static const Color navInactive = Color(0xFF6E6258);
   static const Color chip = Color(0xFFFAEBE2);
   static const Color tint = Color(0xFFF2E4D3); // flipped card, Why box
   static const Color border = Color(0xFFE8DED0);
@@ -88,14 +93,14 @@ ThemeData buildAppTheme() {
         (states) => IconThemeData(
           color: states.contains(WidgetState.selected)
               ? AppColors.primary
-              : AppColors.muted,
+              : AppColors.navInactive,
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => kMonoMicro.copyWith(
           color: states.contains(WidgetState.selected)
               ? AppColors.primary
-              : AppColors.muted,
+              : AppColors.navInactive,
         ),
       ),
     ),
