@@ -17,6 +17,8 @@ import '../save_feedback.dart';
 import '../widgets/add_card_sheet.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/edit_card_sheet.dart';
 
 class DeckEditorScreen extends ConsumerWidget {
   final String deckId;
@@ -305,16 +307,44 @@ class _CardTileState extends ConsumerState<_CardTile> {
   bool _deleting = false;
 
   Future<void> _delete() async {
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Delete card?',
+      what: '"${widget.card.question}" and its review history will be removed.',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _deleting = true);
     final commands = ref.read(cardCommandsProvider);
-    final deleted = await runSave(
-      context,
-      ref,
-      () => commands.deleteCard(widget.card.id),
-      success: 'Card deleted',
+    // Captured now: the Undo tap arrives after this tile has left the list.
+    final messenger = ScaffoldMessenger.of(context);
+    final logger = ref.read(loggerProvider);
+    DeletedCard? deleted;
+    final ok = await runSaveWith(
+      messenger,
+      logger,
+      () async => deleted = await commands.deleteCard(widget.card.id),
     );
     // On success the tile leaves the list; on failure let the user retry.
-    if (!deleted && mounted) setState(() => _deleting = false);
+    if (!ok) {
+      if (mounted) setState(() => _deleting = false);
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Card deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => unawaited(
+            runSaveWith(
+              messenger,
+              logger,
+              () => commands.restoreCard(deleted!),
+              success: 'Card restored',
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -354,11 +384,9 @@ class _CardTileState extends ConsumerState<_CardTile> {
               ),
               const Spacer(),
               TextButton(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Card editing arrives in Phase 3'),
-                  ),
-                ),
+                onPressed: _deleting
+                    ? null
+                    : () => unawaited(showEditCardSheet(context, card)),
                 child: const Text('Edit'),
               ),
               TextButton(
