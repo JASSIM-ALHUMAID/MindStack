@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mindstack/application/cards.dart';
+import 'package:mindstack/application/core_providers.dart';
 import 'package:mindstack/application/library.dart';
 import 'package:mindstack/domain/enums.dart';
 import 'package:mindstack/domain/failures.dart';
@@ -120,6 +121,101 @@ void main() {
     );
   });
 
+  test('editing a card keeps intervalDays, ease and dueAt', () async {
+    final container = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(container);
+    final commands = container.read(cardCommandsProvider);
+    final id = await commands.addCard(deckId: deck, question: 'q', answer: 'a');
+    final rated = await commands.rateCard(id, Rating.good);
+
+    final edited = await commands.updateCard(
+      id: id,
+      question: '  New q ',
+      answer: ' New a ',
+    );
+
+    expect(edited, rated.copyWith(question: 'New q', answer: 'New a'));
+    final stored = (await container.read(deckCardsProvider(deck).future))
+        .single;
+    expect(stored, edited);
+    expect(stored.intervalDays, rated.intervalDays);
+    expect(stored.ease, rated.ease);
+    expect(stored.dueAt, rated.dueAt);
+    expect(stored.mastery, rated.mastery);
+  });
+
+  test('updateCard rejects a blank question and leaves the card', () async {
+    final container = makeContainer();
+    final deck = await _deck(container);
+    final commands = container.read(cardCommandsProvider);
+    final id = await commands.addCard(deckId: deck, question: 'q', answer: 'a');
+
+    await expectLater(
+      commands.updateCard(id: id, question: '  ', answer: 'b'),
+      throwsA(
+        isA<InvalidInput>().having(
+          (e) => e.userMessage,
+          'userMessage',
+          'Enter a question.',
+        ),
+      ),
+    );
+    final stored = (await container.read(deckCardsProvider(deck).future))
+        .single;
+    expect((stored.question, stored.answer), ('q', 'a'));
+  });
+
+  test('updateCard unknown id throws NotFound', () async {
+    final container = makeContainer();
+    await expectLater(
+      container
+          .read(cardCommandsProvider)
+          .updateCard(id: 'nope', question: 'q', answer: 'a'),
+      throwsA(isA<NotFound>()),
+    );
+  });
+
+  test('restoreCard undoes deleteCard with its review logs', () async {
+    final container = makeContainer();
+    final deck = await _deck(container);
+    final commands = container.read(cardCommandsProvider);
+    final id = await commands.addCard(deckId: deck, question: 'q', answer: 'a');
+    final rated = await commands.rateCard(id, Rating.good);
+    final logs = container.read(reviewLogRepositoryProvider);
+
+    final deleted = await commands.deleteCard(id);
+
+    expect(deleted.card, rated);
+    expect(deleted.logs, hasLength(1));
+    expect(await _cards(container, deck), isEmpty);
+    expect(await logs.watchAll().first, isEmpty);
+
+    await commands.restoreCard(deleted);
+
+    expect(await _cards(container, deck), [rated]);
+    expect(await logs.watchAll().first, deleted.logs);
+  });
+
+  test('deck mastery of an empty deck is 0, also after deleting the last '
+      'card', () async {
+    final container = makeContainer();
+    final deck = await _deck(container);
+
+    final empty = (await container.read(deckStatsProvider.future))[deck]!;
+    expect((empty.cardCount, empty.mastery), (0, 0.0));
+
+    final commands = container.read(cardCommandsProvider);
+    final id = await commands.addCard(deckId: deck, question: 'q', answer: 'a');
+    await commands.rateCard(id, Rating.easy);
+    await commands.deleteCard(id);
+
+    final stats = await container
+        .read(cardRepositoryProvider)
+        .watchDeckStats()
+        .first;
+    expect((stats[deck]!.cardCount, stats[deck]!.mastery), (0, 0.0));
+  });
+
   test('deckStatsProvider updates after addCard', () async {
     final container = makeContainer();
     final deck = await _deck(container);
@@ -140,3 +236,8 @@ void main() {
     expect(updates.first, 0);
   });
 }
+
+/// The stored cards of [deckId], read straight from the repository so no
+/// auto-disposed provider value is reused between reads.
+Future<List<Flashcard>> _cards(ProviderContainer container, String deckId) =>
+    container.read(cardRepositoryProvider).watchByDeck(deckId).first;

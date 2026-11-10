@@ -24,6 +24,14 @@ final class DriftReviewLogRepository implements ReviewLogRepository {
   }
 
   @override
+  Future<List<ReviewLog>> byCard(String cardId) => guard(() async {
+    final query = _db.select(_db.reviewLogs)
+      ..where((t) => t.cardId.equals(cardId))
+      ..orderBy([(t) => OrderingTerm.asc(t.rowId)]);
+    return [for (final r in await query.get()) r.toModel()];
+  });
+
+  @override
   Future<void> insert(ReviewLog log) => guard(
     () => _db.into(_db.reviewLogs).insert(log.toCompanion()),
     onForeignKey: () => NotFound(entity: 'card', id: log.cardId),

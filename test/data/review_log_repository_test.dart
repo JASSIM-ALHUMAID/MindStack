@@ -49,6 +49,24 @@ void main() {
     expect(await repo.watchAll().first, [_log('r1', 'k1')]);
   });
 
+  test('byCard returns only that card\'s logs, oldest first', () async {
+    await cards.insert(
+      Flashcard(
+        id: 'k2',
+        deckId: 'd1',
+        question: 'Q2',
+        answer: 'A2',
+        dueAt: DateTime(2026, 11, 4),
+      ),
+    );
+    await repo.insert(_log('r1', 'k1'));
+    await repo.insert(_log('r2', 'k2'));
+    await repo.insert(_log('r3', 'k1'));
+
+    expect(await repo.byCard('k1'), [_log('r1', 'k1'), _log('r3', 'k1')]);
+    expect(await repo.byCard('none'), isEmpty);
+  });
+
   test('insert for unknown card throws NotFound(card)', () async {
     await expectLater(
       repo.insert(_log('r1', 'nope')),

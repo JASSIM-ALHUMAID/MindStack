@@ -109,7 +109,12 @@ class PillLabel extends StatelessWidget {
       ),
       child: Text(
         text.toUpperCase(),
-        style: kMonoMicro.copyWith(color: filled ? Colors.white : color),
+        style: kMonoMicro.copyWith(
+          color: filled
+              ? Colors.white
+              // The accent itself is too light for 10 px text on its tint.
+              : (color == AppColors.primary ? AppColors.primaryInk : color),
+        ),
       ),
     );
   }

@@ -95,6 +95,9 @@ abstract interface class ReviewLogRepository {
   /// Every log entry.
   Stream<List<ReviewLog>> watchAll();
 
+  /// The log entries of card [cardId], oldest first.
+  Future<List<ReviewLog>> byCard(String cardId);
+
   /// Throws `Conflict` on a duplicate id.
   Future<void> insert(ReviewLog log);
 }
