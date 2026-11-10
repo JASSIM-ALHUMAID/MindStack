@@ -72,6 +72,8 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     messenger.showSnackBar(
       SnackBar(
         content: const Text('Draft deleted'),
+        // Flutter keeps a SnackBar with an action open until tapped.
+        persist: false,
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () => unawaited(
