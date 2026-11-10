@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../application/deck_import.dart';
 import '../../application/inbox.dart';
 import '../../application/library.dart';
+import '../../domain/mindstack_file.dart';
 import '../../domain/models/deck.dart';
 import '../../domain/models/draft_card.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/edit_draft_sheet.dart';
 
 class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});
@@ -41,7 +44,23 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
 
   void _notImplemented(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('On-device import arrives in Phase 3')),
+      const SnackBar(content: Text('On-device import arrives in Phase 4')),
+    );
+  }
+
+  Future<void> _import(
+    Future<MindstackFile?> Function(DeckImportNotifier) run,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final deck = await run(ref.read(deckImportProvider.notifier));
+    if (deck == null) return;
+    final n = deck.cards.length;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '$n ${n == 1 ? 'draft' : 'drafts'} imported from ${deck.deckTitle}',
+        ),
+      ),
     );
   }
 
@@ -107,6 +126,8 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     final drafts = widget.drafts;
     final selectedCount = drafts.where((d) => d.selected).length;
     final ocrProgress = ref.watch(ocrProgressProvider);
+    final importState = ref.watch(deckImportProvider);
+    final reading = importState is ImportReading;
     // Watched so the decks are loaded by the time the deck chooser opens; the
     // save button stays disabled until they are.
     final decksReady = ref.watch(decksProvider).hasValue;
@@ -155,11 +176,9 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
               ),
               const SizedBox(height: 4),
               TextButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Importing shared decks arrives in Phase 3'),
-                  ),
-                ),
+                onPressed: reading
+                    ? null
+                    : () => _import((n) => n.pickAndImport()),
                 icon: const Icon(LucideIcons.fileUp, size: 18),
                 label: const Text('Import a shared deck (.mindstack)'),
               ),
@@ -167,26 +186,49 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
                 const SizedBox(height: 12),
                 LinearProgressIndicator(value: ocrProgress),
               ],
+              if (reading) ...[
+                const SizedBox(height: 12),
+                const Text('READING DECK FILE…', style: kMonoLabel),
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(),
+              ],
+              if (importState case ImportFailed(:final message)) ...[
+                const SizedBox(height: 12),
+                _ImportError(
+                  message: message,
+                  onRetry: () => _import((n) => n.retry()),
+                  onChooseAnother: () => _import((n) => n.pickAndImport()),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: 20),
         const Text('Draft cards', style: kSerifSection),
         const SizedBox(height: 8),
-        if (drafts.isEmpty)
-          const SoftCard(
-            padding: EdgeInsets.all(32),
+        if (drafts.isEmpty && !reading)
+          SoftCard(
+            padding: const EdgeInsets.all(32),
             child: Center(
-              child: Text('No drafts yet. Import something above.'),
+              child: Text(
+                importState is ImportFailed
+                    ? 'No drafts yet. Fix the import above.'
+                    : 'No drafts yet. Import something above.',
+              ),
             ),
           ),
         for (final draft in drafts) ...[
           _DraftTile(key: ValueKey(draft.id), draft: draft),
           const SizedBox(height: 12),
         ],
+        if (reading)
+          for (var i = 0; i < 3; i++) ...[
+            const _DraftSkeleton(),
+            const SizedBox(height: 12),
+          ],
         if (drafts.isNotEmpty)
           FilledButton(
-            onPressed: selectedCount == 0 || _busy || !decksReady
+            onPressed: selectedCount == 0 || _busy || !decksReady || reading
                 ? null
                 : _chooseDeck,
             child: Text('Save selected ($selectedCount) to a deck'),
@@ -249,14 +291,7 @@ class _DraftTileState extends ConsumerState<_DraftTile> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Editing drafts arrives in Phase 3',
-                              ),
-                            ),
-                          ),
+                      onPressed: () => showEditDraftSheet(context, draft),
                       child: const Text('EDIT', style: kMonoLabel),
                     ),
                   ],
@@ -268,6 +303,92 @@ class _DraftTileState extends ConsumerState<_DraftTile> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Figma frame "Inbox (Error State)".
+class _ImportError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final VoidCallback onChooseAnother;
+
+  const _ImportError({
+    required this.message,
+    required this.onRetry,
+    required this.onChooseAnother,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "COULDN'T READ THIS FILE",
+          style: kMonoLabel.copyWith(color: AppColors.danger),
+        ),
+        const SizedBox(height: 8),
+        const LinearProgressIndicator(value: 1, color: AppColors.danger),
+        const SizedBox(height: 12),
+        SoftCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("This file couldn't be read", style: kSerifSection),
+              const SizedBox(height: 6),
+              Text(message, style: const TextStyle(color: AppColors.muted)),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: onRetry,
+                  child: const Text('Retry import'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: onChooseAnother,
+                  child: const Text('Choose another file'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Placeholder draft shown while a file is read (Figma "Inbox (Loading State)").
+class _DraftSkeleton extends StatelessWidget {
+  const _DraftSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double width, double height) => Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.chip,
+        borderRadius: BorderRadius.circular(height / 2),
+      ),
+    );
+    return ExcludeSemantics(
+      child: SoftCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [bar(48, 16), const SizedBox(width: 8), bar(56, 16)]),
+            const SizedBox(height: 40),
+            bar(200, 10),
+            const SizedBox(height: 8),
+            bar(double.infinity, 10),
+          ],
+        ),
       ),
     );
   }
