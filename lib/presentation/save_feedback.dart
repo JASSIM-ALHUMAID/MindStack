@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/services.dart';
+import '../core/logger.dart';
 import '../domain/failures.dart';
 
 /// Shown for any failure that is not an [AppFailure]. Matches
@@ -30,9 +31,21 @@ Future<bool> runSave(
   WidgetRef ref,
   Future<void> Function() op, {
   String? success,
+}) => runSaveWith(
+  ScaffoldMessenger.of(context),
+  ref.read(loggerProvider),
+  op,
+  success: success,
+);
+
+/// [runSave] for callers that captured the [messenger] and [logger] earlier,
+/// such as an Undo action that runs after its widget left the tree.
+Future<bool> runSaveWith(
+  ScaffoldMessengerState messenger,
+  AppLogger logger,
+  Future<void> Function() op, {
+  String? success,
 }) async {
-  final messenger = ScaffoldMessenger.of(context);
-  final logger = ref.read(loggerProvider);
   try {
     await op();
   } on Object catch (error, stack) {

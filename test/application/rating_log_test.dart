@@ -21,11 +21,9 @@ Future<String> _newCard(ProviderContainer container) async {
     examDate: DateTime(2026, 12, 1),
   );
   final deck = await library.createDeck(courseId: course, title: 'Deck');
-  return container.read(cardCommandsProvider).addCard(
-    deckId: deck,
-    question: 'Question?',
-    answer: 'Answer.',
-  );
+  return container
+      .read(cardCommandsProvider)
+      .addCard(deckId: deck, question: 'Question?', answer: 'Answer.');
 }
 
 /// Fails after a real insert to verify rollback of both database writes.
@@ -38,9 +36,15 @@ final class _FailAfterInsert implements ReviewLogRepository {
   Stream<List<ReviewLog>> watchAll() => inner.watchAll();
 
   @override
+  Future<List<ReviewLog>> byCard(String cardId) => inner.byCard(cardId);
+
+  @override
   Future<void> insert(ReviewLog log) async {
     await inner.insert(log);
-    throw StorageFailure(StateError('Simulated write failure'), StackTrace.current);
+    throw StorageFailure(
+      StateError('Simulated write failure'),
+      StackTrace.current,
+    );
   }
 }
 
@@ -49,18 +53,19 @@ void main() {
     final container = makeContainer(clock: FixedClock(_now));
     final id = await _newCard(container);
 
-    final rated = await container.read(cardCommandsProvider).rateCard(
-      id,
-      Rating.good,
-      elapsedMs: 2500,
-    );
+    final rated = await container
+        .read(cardCommandsProvider)
+        .rateCard(id, Rating.good, elapsedMs: 2500);
 
     final stored = await container.read(cardRepositoryProvider).byId(id);
     expect(stored, rated);
     expect(stored.intervalDays, 1);
     expect(stored.repetitions, 1);
     expect(stored.dueAt, _now.add(const Duration(days: 1)));
-    final logs = await container.read(reviewLogRepositoryProvider).watchAll().first;
+    final logs = await container
+        .read(reviewLogRepositoryProvider)
+        .watchAll()
+        .first;
     expect(logs, hasLength(1));
     expect(logs.single.cardId, id);
     expect(logs.single.rating, Rating.good);
@@ -68,15 +73,21 @@ void main() {
     expect(logs.single.elapsedMs, 2500);
   });
 
-  test('existing callers record zero elapsed time until timing is wired', () async {
-    final container = makeContainer();
-    final id = await _newCard(container);
-    await container.read(cardCommandsProvider).rateCard(id, Rating.hard);
+  test(
+    'existing callers record zero elapsed time until timing is wired',
+    () async {
+      final container = makeContainer();
+      final id = await _newCard(container);
+      await container.read(cardCommandsProvider).rateCard(id, Rating.hard);
 
-    final logs = await container.read(reviewLogRepositoryProvider).watchAll().first;
-    expect(logs.single.elapsedMs, 0);
-    expect(logs.single.rating, Rating.hard);
-  });
+      final logs = await container
+          .read(reviewLogRepositoryProvider)
+          .watchAll()
+          .first;
+      expect(logs.single.elapsedMs, 0);
+      expect(logs.single.rating, Rating.hard);
+    },
+  );
 
   test('failed log write rolls back the schedule and inserted log', () async {
     final container = makeContainer(
@@ -93,16 +104,17 @@ void main() {
     final before = await cards.byId(id);
 
     await expectLater(
-      container.read(cardCommandsProvider).rateCard(
-        id,
-        Rating.good,
-        elapsedMs: 1500,
-      ),
+      container
+          .read(cardCommandsProvider)
+          .rateCard(id, Rating.good, elapsedMs: 1500),
       throwsA(isA<StorageFailure>()),
     );
 
     expect(await cards.byId(id), before);
-    expect(await container.read(reviewLogRepositoryProvider).watchAll().first, isEmpty);
+    expect(
+      await container.read(reviewLogRepositoryProvider).watchAll().first,
+      isEmpty,
+    );
   });
 
   test('negative elapsed time is rejected without writing', () async {
@@ -112,16 +124,17 @@ void main() {
     final before = await cards.byId(id);
 
     await expectLater(
-      container.read(cardCommandsProvider).rateCard(
-        id,
-        Rating.good,
-        elapsedMs: -1,
-      ),
+      container
+          .read(cardCommandsProvider)
+          .rateCard(id, Rating.good, elapsedMs: -1),
       throwsA(isA<InvalidInput>()),
     );
 
     expect(await cards.byId(id), before);
-    expect(await container.read(reviewLogRepositoryProvider).watchAll().first, isEmpty);
+    expect(
+      await container.read(reviewLogRepositoryProvider).watchAll().first,
+      isEmpty,
+    );
   });
 
   test('missing card does not create a review log', () async {
@@ -130,6 +143,9 @@ void main() {
       container.read(cardCommandsProvider).rateCard('missing', Rating.good),
       throwsA(isA<NotFound>()),
     );
-    expect(await container.read(reviewLogRepositoryProvider).watchAll().first, isEmpty);
+    expect(
+      await container.read(reviewLogRepositoryProvider).watchAll().first,
+      isEmpty,
+    );
   });
 }

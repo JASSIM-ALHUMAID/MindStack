@@ -27,6 +27,10 @@ final deckStatsProvider = StreamProvider<Map<String, DeckStats>>(
   (ref) => ref.watch(cardRepositoryProvider).watchDeckStats(),
 );
 
+/// A card removed by [CardCommands.deleteCard] together with the review logs
+/// that were deleted with it.
+typedef DeletedCard = ({Flashcard card, List<ReviewLog> logs});
+
 /// Writes to flashcards.
 final cardCommandsProvider = Provider<CardCommands>(CardCommands.new);
 
@@ -73,12 +77,58 @@ final class CardCommands {
     return id;
   }
 
-  /// Deletes card [id].
+  /// Replaces the question and answer of card [id] and returns the stored
+  /// card. Scheduling fields, deck and source are kept. [question] and
+  /// [answer] are trimmed. The read and write share one transaction.
+  ///
+  /// Throws [InvalidInput] for a blank question or answer, [NotFound] if the
+  /// card does not exist, and [StorageFailure] if the write fails.
+  Future<Flashcard> updateCard({
+    required String id,
+    required String question,
+    required String answer,
+  }) async {
+    final q = requireText(
+      question,
+      field: 'question',
+      reason: 'Enter a question.',
+    );
+    final a = requireText(answer, field: 'answer', reason: 'Enter an answer.');
+    return _ref.read(transactionRunnerProvider).run(() async {
+      final cards = _ref.read(cardRepositoryProvider);
+      final updated = (await cards.byId(id)).copyWith(question: q, answer: a);
+      await cards.update(updated);
+      return updated;
+    });
+  }
+
+  /// Deletes card [id] and returns what was removed, so [restoreCard] can
+  /// undo it. Deleting a card also deletes its review logs.
   ///
   /// Throws [NotFound] if the card does not exist and [StorageFailure] if the
   /// write fails.
-  Future<void> deleteCard(String id) =>
-      _ref.read(cardRepositoryProvider).delete(id);
+  Future<DeletedCard> deleteCard(String id) =>
+      _ref.read(transactionRunnerProvider).run(() async {
+        final cards = _ref.read(cardRepositoryProvider);
+        final card = await cards.byId(id);
+        final logs = await _ref.read(reviewLogRepositoryProvider).byCard(id);
+        await cards.delete(id);
+        return (card: card, logs: logs);
+      });
+
+  /// Puts back a card removed by [deleteCard], with its review logs, in one
+  /// transaction.
+  ///
+  /// Throws [NotFound] if its deck was deleted meanwhile, [Conflict] if the
+  /// card was already restored, and [StorageFailure] if the write fails.
+  Future<void> restoreCard(DeletedCard deleted) =>
+      _ref.read(transactionRunnerProvider).run(() async {
+        await _ref.read(cardRepositoryProvider).insert(deleted.card);
+        final logs = _ref.read(reviewLogRepositoryProvider);
+        for (final log in deleted.logs) {
+          await logs.insert(log);
+        }
+      });
 
   /// Reschedules card [id] for [rating] at the current time and returns the
   /// stored card. The schedule update and review log share one transaction.

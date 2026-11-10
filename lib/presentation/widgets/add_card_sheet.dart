@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -19,19 +17,84 @@ Future<void> showAddCardSheet(BuildContext context, String deckId) {
   );
 }
 
-class _AddCardSheet extends ConsumerStatefulWidget {
+class _AddCardSheet extends ConsumerWidget {
   final String deckId;
 
   const _AddCardSheet({required this.deckId});
 
   @override
-  ConsumerState<_AddCardSheet> createState() => _AddCardSheetState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The number is cosmetic, so it is left blank rather than blocking the
+    // form while the count loads or if it fails.
+    final count = ref.watch(deckCardsProvider(deckId)).valueOrNull?.length;
+    return CardForm(
+      title: 'Add card',
+      meta: count == null ? null : '#${count + 1} IN DECK',
+      pill: 'Drafting',
+      submitLabel: 'Save card',
+      onSave: (question, answer) {
+        final commands = ref.read(cardCommandsProvider);
+        return runSave(
+          context,
+          ref,
+          () => commands.addCard(
+            deckId: deckId,
+            question: question,
+            answer: answer,
+          ),
+        );
+      },
+    );
+  }
 }
 
-class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
+/// The question and answer form shared by the Add Card and Edit Card sheets.
+/// Validates both fields, calls [onSave] and closes the sheet when it
+/// returns `true`; on `false` the form stays open so the user can retry.
+class CardForm extends StatefulWidget {
+  /// Sheet heading, for example "Add card".
+  final String title;
+
+  /// Small mono label next to [title]; hidden when null.
+  final String? meta;
+
+  /// Pill at the end of the heading row.
+  final String pill;
+
+  /// Label of the primary button.
+  final String submitLabel;
+
+  /// Starting text of the question and answer fields.
+  final String initialQuestion;
+  final String initialAnswer;
+
+  /// Writes the trimmed-by-the-command text and reports the outcome; returns
+  /// whether it was saved.
+  final Future<bool> Function(String question, String answer) onSave;
+
+  const CardForm({
+    super.key,
+    required this.title,
+    required this.pill,
+    required this.submitLabel,
+    required this.onSave,
+    this.meta,
+    this.initialQuestion = '',
+    this.initialAnswer = '',
+  });
+
+  @override
+  State<CardForm> createState() => _CardFormState();
+}
+
+class _CardFormState extends State<CardForm> {
   final _formKey = GlobalKey<FormState>();
-  final _questionController = TextEditingController();
-  final _answerController = TextEditingController();
+  late final _questionController = TextEditingController(
+    text: widget.initialQuestion,
+  );
+  late final _answerController = TextEditingController(
+    text: widget.initialAnswer,
+  );
   bool _saving = false;
 
   @override
@@ -44,16 +107,10 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
   Future<void> _save() async {
     if (_saving || !_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    final commands = ref.read(cardCommandsProvider);
     final navigator = Navigator.of(context);
-    final saved = await runSave(
-      context,
-      ref,
-      () => commands.addCard(
-        deckId: widget.deckId,
-        question: _questionController.text,
-        answer: _answerController.text,
-      ),
+    final saved = await widget.onSave(
+      _questionController.text,
+      _answerController.text,
     );
     // The sheet may have been dismissed while saving; then there is nothing
     // left to close or re-enable.
@@ -67,12 +124,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // The number is cosmetic, so it is left blank rather than blocking the
-    // form while the count loads or if it fails.
-    final count = ref
-        .watch(deckCardsProvider(widget.deckId))
-        .valueOrNull
-        ?.length;
+    final meta = widget.meta;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Form(
@@ -83,12 +135,11 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
           children: [
             Row(
               children: [
-                const Text('Add card', style: kSerifTitle),
+                Text(widget.title, style: kSerifTitle),
                 const SizedBox(width: 8),
-                if (count != null)
-                  Text('#${count + 1} IN DECK', style: kMonoLabel),
+                if (meta != null) Text(meta, style: kMonoLabel),
                 const Spacer(),
-                const PillLabel('Drafting'),
+                PillLabel(widget.pill),
               ],
             ),
             const SizedBox(height: 16),
@@ -108,8 +159,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Enter an answer' : null,
             ),
-            const SizedBox(height: 8),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -141,7 +191,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                 onPressed: _saving ? null : _save,
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(LucideIcons.arrowRight, size: 18),
-                label: const Text('Save card'),
+                label: Text(widget.submitLabel),
               ),
             ),
             const SizedBox(height: 8),

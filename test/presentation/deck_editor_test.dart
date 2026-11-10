@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mindstack/application/cards.dart';
@@ -10,6 +11,7 @@ import 'package:mindstack/data/repositories/drift_library_repository.dart';
 import 'package:mindstack/domain/failures.dart';
 import 'package:mindstack/domain/models/course.dart';
 import 'package:mindstack/domain/models/deck.dart';
+import 'package:mindstack/domain/models/flashcard.dart';
 import 'package:mindstack/domain/repositories.dart';
 import 'package:mindstack/presentation/screens/deck_editor_screen.dart';
 
@@ -121,31 +123,124 @@ void main() {
     expect(find.text('library home'), findsOneWidget);
   });
 
-  testWidgets('deleting a card removes it and confirms', (tester) async {
+  testWidgets('deleting the last card asks first, then shows the empty state '
+      'and Undo brings it back', (tester) async {
     final container = makeContainer();
-    await container.read(appStartupProvider.future);
-    final library = container.read(libraryCommandsProvider);
-    final course = await library.createCourse(
-      title: 'Course',
-      examDate: DateTime(2026, 12, 1),
-    );
-    final deckId = await library.createDeck(courseId: course, title: 'Deck');
-    await container
-        .read(cardCommandsProvider)
-        .addCard(deckId: deckId, question: 'Q1', answer: 'A1');
+    final deckId = await _deckWithOneCard(container);
 
     await pumpInApp(tester, container, DeckEditorScreen(deckId: deckId));
     await tester.pump();
     await tester.pump();
     expect(find.text('Q1'), findsOneWidget);
 
+    // Cancel keeps the card.
     await tester.tap(find.text('Delete'));
-    await tester.pump();
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('Delete card?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Q1'), findsOneWidget);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await _settleDb(tester);
 
     expect(find.text('Q1'), findsNothing);
     expect(find.text('Card deleted'), findsOneWidget);
     expect(find.text('No cards yet. Tap + Card to add one.'), findsOneWidget);
+
+    await tester.tap(find.text('Undo'));
+    await _settleDb(tester);
+
+    expect(find.text('Q1'), findsOneWidget);
+    expect(find.text('No cards yet. Tap + Card to add one.'), findsNothing);
+  });
+
+  testWidgets('edit sheet rejects an empty question and does not save', (
+    tester,
+  ) async {
+    final container = makeContainer();
+    final deckId = await _deckWithOneCard(container);
+
+    await pumpInApp(tester, container, DeckEditorScreen(deckId: deckId));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit card'), findsOneWidget);
+
+    final question = find.widgetWithText(TextFormField, 'Question');
+    await tester.enterText(question, '   ');
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a question'), findsOneWidget);
+    expect(find.text('Edit card'), findsOneWidget);
+    final stored = await _cards(tester, container, deckId);
+    expect(stored.single.question, 'Q1');
+  });
+
+  testWidgets('edit sheet saves new text and keeps the schedule', (
+    tester,
+  ) async {
+    final container = makeContainer();
+    final deckId = await _deckWithOneCard(container);
+    final before = (await _cards(tester, container, deckId)).single;
+
+    await pumpInApp(tester, container, DeckEditorScreen(deckId: deckId));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Answer'),
+      'A1 revised',
+    );
+    await tester.tap(find.text('Save changes'));
+    await _settleDb(tester);
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Edit card'), findsNothing);
+    expect(find.text('A1 revised'), findsOneWidget);
+    final after = (await _cards(tester, container, deckId)).single;
+    expect(after, before.copyWith(answer: 'A1 revised'));
   });
 }
+
+/// Creates a course with one deck holding card Q1/A1; returns the deck id.
+Future<String> _deckWithOneCard(ProviderContainer container) async {
+  await container.read(appStartupProvider.future);
+  final library = container.read(libraryCommandsProvider);
+  final course = await library.createCourse(
+    title: 'Course',
+    examDate: DateTime(2026, 12, 1),
+  );
+  final deckId = await library.createDeck(courseId: course, title: 'Deck');
+  await container
+      .read(cardCommandsProvider)
+      .addCard(deckId: deckId, question: 'Q1', answer: 'A1');
+  return deckId;
+}
+
+/// Lets a database write finish and its stream update reach the widgets.
+Future<void> _settleDb(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
+/// The stored cards of [deckId], read straight from the repository (outside
+/// the test's fake clock) so no auto-disposed provider value is reused.
+Future<List<Flashcard>> _cards(
+  WidgetTester tester,
+  ProviderContainer container,
+  String deckId,
+) async => (await tester.runAsync(
+  () => container.read(cardRepositoryProvider).watchByDeck(deckId).first,
+))!;
