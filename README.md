@@ -1,39 +1,46 @@
-# MindStack (SWE 463 Phase 2 starter)
+# MindStack (SWE 463 Phase 3 prototype)
 
 Spaced-repetition study app. Students import lecture material (screenshots, camera photos, PDFs), turn it into flashcards on the device, and review them on a schedule that ends at their exam date. Everything stays on the phone: no account, no server.
 
-This repository is the Phase 2 starter project. It runs on Android (tested by the group), every main screen is reachable, and the core flows (courses, decks, cards, review, quiz, stats) work on local sample data. Import with on-device OCR, read-aloud and study reminders are planned for Phase 3.
+This repository is the Phase 3 working prototype. It runs on Android (tested by the group on a physical phone). Courses, decks, cards, drafts, review history and settings are saved on the device and are still there after a restart.
 
 ## Run it
 
-Requires Flutter 3.47 or newer (Dart 3.13).
+Requires Flutter 3.47 or newer (Dart 3.13) and an Android phone or emulator.
 
 ```bash
+git clone https://github.com/JASSIM-ALHUMAID/MindStack
+cd MindStack
+git checkout phase-3
 flutter pub get
 flutter run
 flutter test
 flutter analyze
 ```
 
+The generated drift code is committed, so no build step is needed. To try the Inbox import, push the sample files to the phone: `adb push test/fixtures/mindstack/valid/ /sdcard/Download/`, then use Import a shared deck in the Inbox.
+
 Fonts load at start-up, so after pulling changes do a full restart, not a hot reload.
 
-## What works in the starter
+## Implemented Phase 3 features
 
 - **Navigation:** bottom bar with Inbox, Library, Review, Quiz and Stats. The app opens on Library. Deck Editor is pushed with go_router (`/deck/:deckId`); Android back from another tab returns to Library.
-- **Library:** courses with days to exam, decks with card count and mastery. + Course opens the Create Course sheet (title and exam date, with validation). + Deck on a course opens the Create Deck sheet and then the new deck.
-- **Deck Editor:** card list, Add Card and Edit Card sheets with validation (editing keeps the card's schedule), delete a card with a confirmation and Undo, Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder).
-- **Inbox:** Import a shared deck turns a `.mindstack` file into drafts, with loading and error states (Retry, Choose another file). Drafts can be edited, ticked, swiped to delete (with Undo) and saved to a deck. Screenshots and PDF (OCR) are yet to be added.
-- **Review:** refreshed due-card queue, deck filtering, saved ratings and review logs, and session summaries showing count, time, pace and next due date.
+- **Library (F3):** courses with days to exam, decks with card count and mastery. + Course opens the Create Course sheet (title and exam date, with validation). + Deck on a course opens the Create Deck sheet and then the new deck.
+- **Deck Editor (F4):** card list, Add Card and Edit Card sheets with validation (editing keeps the card's schedule), delete a card with a confirmation and Undo, Study (reviews this deck), and a ⋮ menu with Merge into another deck (sheet, confirm dialog, works) and Share deck (placeholder, not built yet).
+- **Inbox (F2, shared decks):** Import a shared deck turns a `.mindstack` file into drafts, with loading and error states (Retry, Choose another file). Drafts can be edited, ticked, swiped to delete (with Undo) and saved to a deck. Screenshots, photos and PDF (OCR) import are not built yet.
+- **Review (F5, in progress):** refreshed due-card queue, deck filtering, saved ratings and review logs, and session summaries showing count, time, pace and next due date.
 - **Settings:** TTS toggle and reminder time are saved with shared_preferences and restored at startup.
-- **Quiz:** up to five multiple-choice questions built from your stored cards (the right answer plus three answers from other cards, same deck first). A wrong answer is logged as "Again" for that card, so it is due in the next review. Results show score, accuracy, seconds per question and the missed cards; Review weak cards studies exactly those. With fewer than 4 cards the Quiz tab explains that more cards are needed. The quiz is rebuilt when the tab opens unless one is in progress.
-- **Stats:** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
+- **Quiz (F6):** up to five multiple-choice questions built from your stored cards (the right answer plus three answers from other cards, same deck first). A wrong answer is logged as "Again" for that card, so it is due in the next review. Results show score, accuracy, seconds per question and the missed cards; Review weak cards studies exactly those. With fewer than 4 cards the Quiz tab explains that more cards are needed. The quiz is rebuilt when the tab opens unless one is in progress.
+- **Stats (F7, in progress):** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
 
-Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. Review takes a fresh queue snapshot when a session starts and reads each current card live; it does not reorder the queue during a session.
+## Data source
 
-### Known limitations (Phase 3 work)
+All data is local. Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. Review takes a fresh queue snapshot when a session starts and reads each current card live; it does not reorder the queue during a session.
+
+## Known issues
 
 - Review again repeats the previous queue. Timing does not pause while the app is in the background.
-- The Stats streak is placeholder history.
+- The Stats streak grid and quota use placeholder history.
 - Share deck is a placeholder, so `.mindstack` files come from `test/fixtures/mindstack` for now.
 - Undoing a draft delete puts it at the end of the list.
 - Arabic (right-to-left) text displays in the wrong order.
@@ -123,7 +130,7 @@ Figma: https://www.figma.com/design/KAn2gOCkXUHv5M9FcC4rlW/SWE463?node-id=0-1&p=
 
 ## AI use disclosure
 
-Claude (Anthropic) was the only AI tool used. It helped draft parts of the technical plan, the navigation diagram and some of the starter Flutter code.
+Claude (Anthropic) was used in this project. It was used to enhance the overall design and architecture of the project, and it helped in creating the tests.
 
 ## Team
 
