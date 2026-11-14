@@ -1,10 +1,8 @@
-import 'package:flutter/foundation.dart';
-
 /// Number of days shown in the Stats streak grid.
 const int kStreakGridDays = 28;
 
 /// Study streak figures computed from review times.
-@immutable
+
 class StreakInfo {
   /// Creates the figures; [days] is oldest first and ends with [today].
   const StreakInfo({
@@ -38,13 +36,21 @@ class StreakInfo {
   /// Whether nothing has ever been reviewed.
   bool get isEmpty => best == 0;
 
+  bool _sameDays(List<bool> other) {
+    if (other.length != days.length) return false;
+    for (var i = 0; i < days.length; i++) {
+      if (other[i] != days[i]) return false;
+    }
+    return true;
+  }
+
   @override
   bool operator ==(Object other) =>
       other is StreakInfo &&
       other.current == current &&
       other.best == best &&
       other.today == today &&
-      listEquals(other.days, days);
+      _sameDays(other.days);
 
   @override
   int get hashCode => Object.hash(current, best, today, Object.hashAll(days));
