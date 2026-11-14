@@ -31,7 +31,7 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 - **Review (F5, in progress):** refreshed due-card queue, deck filtering, saved ratings and review logs, and session summaries showing count, time, pace and next due date.
 - **Settings:** TTS toggle and reminder time are saved with shared_preferences and restored at startup.
 - **Quiz (F6):** up to five multiple-choice questions built from your stored cards (the right answer plus three answers from other cards, same deck first). A wrong answer is logged as "Again" for that card, so it is due in the next review. Results show score, accuracy, seconds per question and the missed cards; Review weak cards studies exactly those. With fewer than 4 cards the Quiz tab explains that more cards are needed. The quiz is rebuilt when the tab opens unless one is in progress.
-- **Stats (F7, in progress):** 28-day streak grid (placeholder history), mastery by deck (fl_chart), exam quota planner, weakest cards with Drill now.
+- **Stats (F7):** study streak from the review logs (current and best streak, and a 28-day grid of the days with a review), mastery by deck (fl_chart, average weighted by card count), exam quota planner with inline messages for an invalid total or a past date, and the 3 weakest reviewed cards with Drill now (starts Review with exactly those cards). Empty states when nothing has been reviewed yet.
 
 ## Data source
 
@@ -40,7 +40,6 @@ All data is local. Courses, decks, cards, OCR drafts and review logs are stored 
 ## Known issues
 
 - Review again repeats the previous queue. Timing does not pause while the app is in the background.
-- The Stats streak grid and quota use placeholder history.
 - Share deck is a placeholder, so `.mindstack` files come from `test/fixtures/mindstack` for now.
 - Undoing a draft delete puts it at the end of the list.
 - Arabic (right-to-left) text displays in the wrong order.
@@ -67,7 +66,7 @@ lib/
   route_names.dart             route paths
   theme/app_theme.dart         Material 3 theme, colors and fonts from Figma
   core/                        clock, ids, logger, dates (no app imports)
-  domain/                      enums, failures, scheduler, quiz builder, .mindstack file format, repository and file picker interfaces
+  domain/                      enums, failures, scheduler, quiz builder, streak, .mindstack file format, repository and file picker interfaces
     models/                    Course, Deck, DeckStats, Flashcard, DraftCard, ReviewLog, ReviewResult, QuizQuestion
   data/                        drift implementation of the domain interfaces
     database/                  AppDatabase, tables, converters, generated app_database.g.dart
@@ -75,14 +74,14 @@ lib/
     drift_transaction_runner.dart, failure_mapping.dart, mappers.dart
     platform_deck_file_picker.dart
     seed.dart, sample_data.dart
-  application/                 Riverpod providers, command classes, startup, review, quiz and deck import notifiers
+  application/                 Riverpod providers, command classes, startup, stats, review, quiz and deck import notifiers
   presentation/                format.dart, save_feedback.dart
     screens/                   app_shell, library, deck_editor, inbox, review, quiz, stats
     widgets/                   app_gate, async_value_view, common, create_course_sheet, create_deck_sheet, add_card_sheet (shared CardForm), edit_card_sheet, edit_draft_sheet, confirm_delete_dialog
 assets/fonts/                  Newsreader, Inter, JetBrains Mono + licenses
 test/
   domain/ data/                unit tests, and repository tests on an in-memory database
-  application/                 command, review, settings and startup tests
+  application/                 command, review, quiz, stats, settings and startup tests
   presentation/                widget tests
   support/                     shared test fakes, container and database helpers
   fixtures/mindstack/          sample .mindstack files
