@@ -35,7 +35,7 @@ Fonts load at start-up, so after pulling changes do a full restart, not a hot re
 
 ## Data source
 
-All data is local. Courses, decks, cards, OCR drafts and review logs are stored in a local SQLite database (drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox and Stats read live database queries, so they update as soon as a write completes. Review takes a fresh queue snapshot when a session starts and reads each current card live; it does not reorder the queue during a session.
+All data is local. Courses, decks, cards, Inbox drafts, and review logs are stored in a local SQLite database (Drift). The sample data in `lib/data/sample_data.dart` is seeded on the first launch only. Library, Deck Editor, Inbox, and Stats read live database queries, so they update as soon as a write completes. Review takes a fresh queue snapshot when a session starts and reads each current card live; it does not reorder the queue during a session.
 
 ## Known issues
 
