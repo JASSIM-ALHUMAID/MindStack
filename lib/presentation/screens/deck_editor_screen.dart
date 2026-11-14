@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../application/cards.dart';
 import '../../application/library.dart';
@@ -12,6 +15,7 @@ import '../../application/services.dart';
 import '../../application/tab.dart';
 import '../../domain/models/deck.dart';
 import '../../domain/models/flashcard.dart';
+import '../../domain/mindstack_file.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import '../widgets/add_card_sheet.dart';
@@ -73,6 +77,7 @@ class _DeckEditor extends ConsumerStatefulWidget {
 class _DeckEditorState extends ConsumerState<_DeckEditor> {
   /// True while a merge flow is running, so a second one cannot start.
   bool _merging = false;
+  bool _sharing = false;
 
   Future<void> _merge() async {
     if (_merging) return;
@@ -81,6 +86,54 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
       await _mergeDeck(context, ref, widget.deck);
     } finally {
       if (mounted) setState(() => _merging = false);
+    }
+  }
+
+  Future<void> _shareDeck() async {
+    if (_sharing) return;
+    final cards = ref.read(deckCardsProvider(widget.deck.id)).valueOrNull ??
+        const <Flashcard>[];
+    if (cards.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Add a card before sharing this deck.')),
+        );
+      }
+      return;
+    }
+    setState(() => _sharing = true);
+    try {
+      final file = MindstackFile(
+        deckTitle: widget.deck.title,
+        cards: [
+          for (final card in cards)
+            MindstackCard(
+              question: card.question,
+              answer: card.answer,
+              source: card.source,
+            ),
+        ],
+      );
+      final directory = await getTemporaryDirectory();
+      final path = '${directory.path}/${_safeFileName(widget.deck.title)}'
+          '${MindstackFile.extension}';
+      await File(path).writeAsString(file.encode());
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(path, mimeType: 'application/json')],
+          text: 'MindStack deck: ${widget.deck.title}',
+        ),
+      );
+    } on Object catch (error, stack) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not share deck: $error')),
+        );
+      }
+      debugPrint('Deck export failed: $error\n$stack');
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
@@ -128,11 +181,7 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
                   // its own outcome through the sheet and snackbars.
                   unawaited(_merge());
                 case _DeckAction.share:
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Deck sharing arrives in Phase 3'),
-                    ),
-                  );
+                  unawaited(_shareDeck());
               }
             },
             itemBuilder: (_) => [
@@ -144,8 +193,9 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
                   title: Text('Merge into another deck'),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _DeckAction.share,
+                enabled: !_sharing,
                 child: ListTile(
                   leading: Icon(LucideIcons.share),
                   title: Text('Share deck'),
@@ -206,6 +256,11 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
       ),
     );
   }
+}
+
+String _safeFileName(String title) {
+  final name = title.trim().replaceAll(RegExp(r'[^a-zA-Z0-9 _-]'), '');
+  return (name.isEmpty ? 'mindstack-deck' : name).replaceAll(' ', '_');
 }
 
 enum _DeckAction { merge, share }

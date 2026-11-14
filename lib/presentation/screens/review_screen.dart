@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../application/library.dart';
@@ -31,6 +32,50 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   // must hide it even when its first card has the same id as before.
   String? _revealedId;
   int? _revealedSessionId;
+  final FlutterTts _tts = FlutterTts();
+  String? _lastSpokenKey;
+
+  @override
+  void dispose() {
+    unawaited(_stopTts());
+    super.dispose();
+  }
+
+  Future<void> _stopTts() async {
+    try {
+      await _tts.stop();
+    } on Object {
+      // Native TTS is unavailable in widget tests and on unsupported targets.
+    }
+  }
+
+  Future<void> _speak(String text) async {
+    try {
+      await _tts.speak(text);
+    } on Object {
+      // Keep review usable when a platform has no configured TTS engine.
+    }
+  }
+
+  void _speakIfEnabled({
+    required Flashcard card,
+    required bool showAnswer,
+    required bool enabled,
+  }) {
+    if (!enabled) {
+      _lastSpokenKey = null;
+      unawaited(_stopTts());
+      return;
+    }
+    final key = '${card.id}:${showAnswer ? 'answer' : 'question'}';
+    if (_lastSpokenKey == key) return;
+    _lastSpokenKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(_speak(showAnswer ? card.answer : card.question));
+      }
+    });
+  }
 
   Future<void> _rate(Rating rating) async {
     final notifier = ref.read(reviewProvider.notifier);
@@ -115,25 +160,43 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                       ],
                     ),
                   )
-                : _CardView(
-                    card: card,
-                    number: review.index + 1,
-                    total: total,
-                    showAnswer:
-                        _revealedId == card.id &&
-                        _revealedSessionId == review.sessionId,
-                    saving: review.saving,
-                    onFlip: () => setState(() {
-                      final wasRevealed =
-                          _revealedId == card.id &&
-                          _revealedSessionId == review.sessionId;
-                      _revealedId = wasRevealed ? null : card.id;
-                      _revealedSessionId = review.sessionId;
-                    }),
-                    onRate: (rating) => unawaited(_rate(rating)),
-                  ),
+                : _reviewCardView(card, review, settings.ttsEnabled),
           ),
       ],
+    );
+  }
+
+  Widget _reviewCardView(
+    Flashcard card,
+    ReviewState review,
+    bool ttsEnabled,
+  ) {
+    final showAnswer =
+        _revealedId == card.id && _revealedSessionId == review.sessionId;
+    _speakIfEnabled(
+      card: card,
+      showAnswer: showAnswer,
+      enabled: ttsEnabled,
+    );
+    return _CardView(
+      card: card,
+      number: review.index + 1,
+      total: review.cardIds.length,
+      showAnswer: showAnswer,
+      saving: review.saving,
+      onFlip: () {
+        final nextRevealed = !showAnswer;
+        setState(() {
+          _revealedId = nextRevealed ? card.id : null;
+          _revealedSessionId = review.sessionId;
+        });
+        _speakIfEnabled(
+          card: card,
+          showAnswer: nextRevealed,
+          enabled: ttsEnabled,
+        );
+      },
+      onRate: (rating) => unawaited(_rate(rating)),
     );
   }
 }
