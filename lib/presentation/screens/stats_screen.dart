@@ -4,15 +4,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/cards.dart';
-import '../../application/library.dart';
 import '../../application/review.dart';
 import '../../application/services.dart';
+import '../../application/stats.dart';
 import '../../application/tab.dart';
 import '../../core/dates.dart';
-import '../../domain/models/deck.dart';
-import '../../domain/models/deck_stats.dart';
 import '../../domain/models/flashcard.dart';
+import '../../domain/streak.dart';
 import '../../theme/app_theme.dart';
 import '../format.dart';
 import '../widgets/async_value_view.dart';
@@ -35,8 +33,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   String? _planText;
   int? _planDays;
 
-  // Placeholder study history (days of the last 4 weeks with no session).
-  static const Set<int> _missedDays = {3, 6, 11, 12, 15, 18};
+  /// Inline message under the planner inputs; null when they are valid.
+  String? _planError;
 
   @override
   void dispose() {
@@ -57,20 +55,28 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
   void _plan() {
     final total = int.tryParse(_totalController.text.trim());
-    final days = _examDate
-        .difference(dateOnly(ref.read(clockProvider).now()))
-        .inDays;
-    if (total == null || total <= 0 || days <= 0) {
+    // Rounded: a daylight-saving change makes one day 23 or 25 hours long.
+    final days =
+        (_examDate.difference(dateOnly(ref.read(clockProvider).now())).inHours /
+                24)
+            .round();
+    final error = total == null || total <= 0
+        ? 'Enter a whole number of cards, 1 or more.'
+        : (days <= 0 ? 'Pick an exam date after today.' : null);
+    if (error != null) {
       setState(() {
-        _planText = 'Enter a card total and an exam date in the future.';
+        _planError = error;
+        _planText = null;
         _planDays = null;
       });
       return;
     }
-    final perDay = (total / days).ceil();
+    final perDay = (total! / days).ceil();
     setState(() {
+      _planError = null;
       _planText =
-          '$perDay cards per day to cover all $total cards. Review the weakest ones first.';
+          '$perDay ${perDay == 1 ? 'card' : 'cards'} per day to cover all '
+          '$total cards. Review the weakest ones first.';
       _planDays = days;
     });
   }
@@ -83,86 +89,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         const ScreenHeader(eyebrow: 'MASTERY · STREAK · EXAMS', title: 'Stats'),
         const SizedBox(height: 16),
         SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Study streak', style: kSerifSection),
-                        Text('7-DAY STREAK', style: kMonoLabel),
-                      ],
-                    ),
-                  ),
-                  Text('7', style: kSerifTitle.copyWith(fontSize: 36)),
-                  const Text(' DAYS', style: kMonoLabel),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  for (final d in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
-                    Expanded(
-                      child: Center(child: Text(d, style: kMonoMicro)),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              GridView.count(
-                crossAxisCount: 7,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-                children: [
-                  for (var day = 1; day <= 28; day++)
-                    Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: _missedDays.contains(day)
-                            ? AppColors.chip
-                            : AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                        // Day 28 is today in the placeholder history.
-                        border: day == 28
-                            ? Border.all(color: AppColors.ink, width: 2)
-                            : null,
-                      ),
-                      child: Text(
-                        '$day',
-                        style: TextStyle(
-                          color: _missedDays.contains(day)
-                              ? AppColors.muted
-                              : Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const Divider(height: 24),
-              Text(
-                '${28 - _missedDays.length} SESSIONS LOGGED (SAMPLE DATA)',
-                style: kMonoLabel,
-              ),
-            ],
+          child: AsyncValueView<StreakInfo>(
+            value: ref.watch(streakProvider),
+            data: (streak) => _StreakSection(streak: streak),
           ),
         ),
         const SizedBox(height: 16),
         SoftCard(
-          child: AsyncValueView<List<Flashcard>>(
-            value: ref.watch(allCardsProvider),
-            data: (cards) => AsyncValueView<List<Deck>>(
-              value: ref.watch(decksProvider),
-              data: (decks) => AsyncValueView<Map<String, DeckStats>>(
-                value: ref.watch(deckStatsProvider),
-                data: (stats) =>
-                    _MasterySection(cards: cards, decks: decks, stats: stats),
-              ),
-            ),
+          child: AsyncValueView<List<DeckMastery>>(
+            value: ref.watch(masteryByDeckProvider),
+            data: (decks) => _MasterySection(decks: decks),
           ),
         ),
         const SizedBox(height: 16),
@@ -217,6 +153,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   ),
                 ],
               ),
+              if (_planError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _planError!,
+                  style: kBodySmall.copyWith(color: AppColors.danger),
+                ),
+              ],
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -253,93 +196,226 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         const SizedBox(height: 16),
         SoftCard(
           child: AsyncValueView<List<Flashcard>>(
-            value: ref.watch(allCardsProvider),
-            data: (cards) => _WeakestSection(cards: cards),
+            value: ref.watch(weakestCardsProvider),
+            data: (weakest) => _WeakestSection(weakest: weakest),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Current and best streak, and the last 28 days as a grid.
+class _StreakSection extends StatelessWidget {
+  final StreakInfo streak;
+
+  const _StreakSection({required this.streak});
+
+  static const List<String> _weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    final current = streak.current;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Study streak', style: kSerifSection),
+                  Text(
+                    'BEST: ${streak.best} ${streak.best == 1 ? 'DAY' : 'DAYS'}',
+                    style: kMonoLabel,
+                  ),
+                ],
+              ),
+            ),
+            Text('$current', style: kSerifTitle.copyWith(fontSize: 36)),
+            Text(current == 1 ? ' DAY' : ' DAYS', style: kMonoLabel),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Columns follow the real weekdays of the first row's dates.
+        Row(
+          children: [
+            for (var i = 0; i < 7; i++)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    _weekdays[streak.dayAt(i).weekday - 1],
+                    style: kMonoMicro,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        GridView.count(
+          crossAxisCount: 7,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 6,
+          children: [
+            for (var i = 0; i < streak.days.length; i++)
+              _DayCell(
+                date: streak.dayAt(i),
+                studied: streak.days[i],
+                today: i == streak.days.length - 1,
+              ),
+          ],
+        ),
+        const Divider(height: 24),
+        Text(
+          streak.isEmpty
+              ? 'No reviews yet. Rate a card in Review to start a streak.'
+              : '${streak.studyDays} STUDY DAYS IN THE LAST $kStreakGridDays',
+          style: streak.isEmpty ? kBodySmall : kMonoLabel,
+        ),
+      ],
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  final DateTime date;
+  final bool studied;
+  final bool today;
+
+  const _DayCell({
+    required this.date,
+    required this.studied,
+    required this.today,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label:
+          '${formatDate(date)}: ${studied ? 'studied' : 'no review'}'
+          '${today ? ', today' : ''}',
+      excludeSemantics: true,
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: studied ? AppColors.primary : AppColors.chip,
+          borderRadius: BorderRadius.circular(8),
+          border: today ? Border.all(color: AppColors.ink, width: 2) : null,
+        ),
+        child: Text(
+          '${date.day}',
+          style: TextStyle(
+            color: studied ? Colors.white : AppColors.muted,
+            fontSize: 12,
+          ),
+        ),
+      ),
     );
   }
 }
 
 /// Average mastery and the per-deck mastery chart.
 class _MasterySection extends StatelessWidget {
-  final List<Flashcard> cards;
-  final List<Deck> decks;
-  final Map<String, DeckStats> stats;
+  final List<DeckMastery> decks;
 
-  const _MasterySection({
-    required this.cards,
-    required this.decks,
-    required this.stats,
-  });
+  const _MasterySection({required this.decks});
 
   @override
   Widget build(BuildContext context) {
-    final avgMastery = cards.isEmpty
-        ? 0.0
-        : cards.fold<double>(0, (sum, c) => sum + c.mastery) / cards.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Expanded(child: Text('MASTERY BY DECK', style: kMonoLabel)),
-            Text('AVG: ${(avgMastery * 100).round()}%', style: kMonoLabel),
+            Text(
+              'AVG: ${(averageMastery(decks) * 100).round()}%',
+              style: kMonoLabel,
+            ),
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 200,
-          child: _MasteryChart(
-            labels: [for (final d in decks) d.title],
-            values: [for (final d in decks) stats[d.id]?.mastery ?? 0.0],
+        if (decks.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                'No decks yet. Add one in Library.',
+                style: kBodySmall,
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 200,
+            child: _MasteryChart(
+              labels: [for (final d in decks) d.title],
+              values: [for (final d in decks) d.mastery],
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
-/// The three lowest-mastery cards and the button that drills them.
+/// The reviewed cards with the lowest mastery and the button that drills
+/// exactly those cards.
 class _WeakestSection extends ConsumerWidget {
-  final List<Flashcard> cards;
+  final List<Flashcard> weakest;
 
-  const _WeakestSection({required this.cards});
+  const _WeakestSection({required this.weakest});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final weakest = ([
-      ...cards,
-    ]..sort((a, b) => a.mastery.compareTo(b.mastery))).take(3).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('WEAKEST CARDS', style: kMonoLabel),
         const SizedBox(height: 8),
+        if (weakest.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'No reviews yet. Cards you review show here, weakest first.',
+              style: kBodySmall,
+            ),
+          ),
         for (final card in weakest)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
                 Expanded(child: Text(card.question)),
-                const PillLabel('WEAK'),
+                const SizedBox(width: 8),
+                PillLabel('${(card.mastery * 100).round()}% · weak'),
               ],
             ),
           ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {
-              // Loads the queue in the background; the Review tab shows its
-              // own loading and error states.
-              unawaited(ref.read(reviewProvider.notifier).startWeak());
-              ref.read(tabIndexProvider.notifier).set(2);
-            },
-            child: Text('Drill ${weakest.length} weak cards now'),
+        if (weakest.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () {
+                // Loads the queue in the background; the Review tab shows its
+                // own loading and error states.
+                unawaited(
+                  ref
+                      .read(reviewProvider.notifier)
+                      .start(cardIds: [for (final c in weakest) c.id]),
+                );
+                ref.read(tabIndexProvider.notifier).set(2);
+              },
+              child: Text(
+                'Drill ${weakest.length} weak '
+                '${weakest.length == 1 ? 'card' : 'cards'} now',
+              ),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
