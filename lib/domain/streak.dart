@@ -2,7 +2,6 @@
 const int kStreakGridDays = 28;
 
 /// Study streak figures computed from review times.
-
 class StreakInfo {
   /// Creates the figures; [days] is oldest first and ends with [today].
   const StreakInfo({
