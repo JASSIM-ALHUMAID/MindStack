@@ -157,6 +157,31 @@ void main() {
     expect(find.text('No cards yet. Tap + Card to add one.'), findsNothing);
   });
 
+  testWidgets('sharing a deck logs the failure through the app logger', (
+    tester,
+  ) async {
+    final logger = RecordingLogger();
+    final container = makeContainer(
+      overrides: [loggerProvider.overrideWithValue(logger)],
+    );
+    final deckId = await _deckWithOneCard(container);
+
+    await pumpInApp(tester, container, DeckEditorScreen(deckId: deckId));
+    await tester.pump();
+    await tester.pump();
+
+    // path_provider has no test implementation, so the export fails before
+    // the platform share sheet can open.
+    await tester.tap(find.byTooltip('More deck actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Share deck'));
+    await _settleDb(tester);
+
+    expect(find.textContaining('Could not share deck:'), findsOneWidget);
+    expect(logger.errors, hasLength(1));
+    expect(logger.errors.single.message, 'Deck export failed');
+  });
+
   testWidgets('edit sheet rejects an empty question and does not save', (
     tester,
   ) async {

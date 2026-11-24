@@ -13,9 +13,9 @@ import '../../application/library.dart';
 import '../../application/review.dart';
 import '../../application/services.dart';
 import '../../application/tab.dart';
+import '../../domain/mindstack_file.dart';
 import '../../domain/models/deck.dart';
 import '../../domain/models/flashcard.dart';
-import '../../domain/mindstack_file.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import '../widgets/add_card_sheet.dart';
@@ -91,6 +91,8 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
 
   Future<void> _shareDeck() async {
     if (_sharing) return;
+    // Captured before awaiting: the widget may be gone when the export fails.
+    final logger = ref.read(loggerProvider);
     final cards = ref.read(deckCardsProvider(widget.deck.id)).valueOrNull ??
         const <Flashcard>[];
     if (cards.isEmpty) {
@@ -131,7 +133,7 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
           SnackBar(content: Text('Could not share deck: $error')),
         );
       }
-      debugPrint('Deck export failed: $error\n$stack');
+      logger.error('Deck export failed', error, stack);
     } finally {
       if (mounted) setState(() => _sharing = false);
     }
@@ -196,7 +198,7 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
               PopupMenuItem(
                 value: _DeckAction.share,
                 enabled: !_sharing,
-                child: ListTile(
+                child: const ListTile(
                   leading: Icon(LucideIcons.share),
                   title: Text('Share deck'),
                 ),
