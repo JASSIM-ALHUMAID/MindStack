@@ -49,7 +49,7 @@ Future<void> seedIfNeeded(AppDatabase db, SeedData data) => guard(
       b.insertAll(db.decks, [for (final d in data.decks) d.toCompanion()]);
       b.insertAll(db.flashcards, [for (final c in data.cards) c.toCompanion()]);
       b.insertAll(db.draftCards, [
-        for (final d in data.drafts) d.toCompanion(),
+        for (final (i, d) in data.drafts.indexed) d.toCompanion(i + 1),
       ]);
     });
     await db

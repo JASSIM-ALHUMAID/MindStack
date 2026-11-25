@@ -10,6 +10,7 @@ class DraftCard {
     required this.question,
     required this.answer,
     this.selected = true,
+    this.position,
   });
 
   /// Stable unique id.
@@ -30,6 +31,10 @@ class DraftCard {
   /// Whether the user has ticked this draft for saving.
   final bool selected;
 
+  /// Place in the Inbox list, or null for a draft that is not stored yet.
+  /// A stored draft re-inserted with its position returns to the same place.
+  final int? position;
+
   /// A copy with [selected] replaced; every other field is kept.
   DraftCard copyWith({bool? selected}) {
     return DraftCard(
@@ -39,6 +44,7 @@ class DraftCard {
       question: question,
       answer: answer,
       selected: selected ?? this.selected,
+      position: position,
     );
   }
 
@@ -51,15 +57,16 @@ class DraftCard {
           other.sourceRef == sourceRef &&
           other.question == question &&
           other.answer == answer &&
-          other.selected == selected;
+          other.selected == selected &&
+          other.position == position;
 
   @override
   int get hashCode =>
-      Object.hash(id, source, sourceRef, question, answer, selected);
+      Object.hash(id, source, sourceRef, question, answer, selected, position);
 
   @override
   String toString() =>
       'DraftCard(id: $id, source: ${source.name}, '
       'sourceRef: $sourceRef, question: $question, answer: $answer, '
-      'selected: $selected)';
+      'selected: $selected, position: $position)';
 }

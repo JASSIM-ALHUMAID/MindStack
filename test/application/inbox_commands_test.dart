@@ -53,13 +53,14 @@ final _now = DateTime(2026, 11, 4, 12);
 String _fixture(String path) =>
     File('test/fixtures/mindstack/$path').readAsStringSync();
 
-DraftCard _draft(String id, {bool selected = true}) => DraftCard(
+DraftCard _draft(String id, {bool selected = true, int? position}) => DraftCard(
   id: id,
   source: CardSource.photo,
   sourceRef: 'Whiteboard $id',
   question: 'Q $id',
   answer: 'A $id',
   selected: selected,
+  position: position,
 );
 
 Future<String> _deck(ProviderContainer container) async {
@@ -185,7 +186,7 @@ void main() {
     );
   });
 
-  test('deleteDraft removes one draft; restoreDraft brings it back', () async {
+  test('restoreDraft puts a deleted draft back in its place', () async {
     final container = makeContainer();
     await container.read(draftRepositoryProvider).insertAll([
       _draft('a'),
@@ -193,15 +194,16 @@ void main() {
       _draft('c'),
     ]);
     final inbox = container.read(inboxCommandsProvider);
+    final deleted = (await container.read(draftsProvider.future))[1];
 
     await inbox.deleteDraft('b');
-    var drafts = await container.read(draftsProvider.future);
+    var drafts = await container.read(draftRepositoryProvider).watchAll().first;
     expect([for (final d in drafts) d.id], ['a', 'c']);
 
-    await inbox.restoreDraft(_draft('b', selected: false));
+    await inbox.restoreDraft(deleted);
     drafts = await container.read(draftRepositoryProvider).watchAll().first;
-    expect([for (final d in drafts) d.id], ['a', 'c', 'b']);
-    expect(drafts.last.selected, isFalse);
+    expect([for (final d in drafts) d.id], ['a', 'b', 'c']);
+    expect(drafts[1], deleted);
   });
 
   group('updateDraft', () {
@@ -236,7 +238,10 @@ void main() {
           ),
         ),
       );
-      expect((await container.read(draftsProvider.future)).single, _draft('a'));
+      expect(
+        (await container.read(draftsProvider.future)).single,
+        _draft('a', position: 1),
+      );
     });
 
     test('missing draft throws NotFound', () async {

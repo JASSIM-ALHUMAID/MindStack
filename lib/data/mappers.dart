@@ -65,15 +65,16 @@ extension FlashcardRowToModel on FlashcardRow {
   );
 }
 
-/// Converts a [DraftCard] into an insert companion.
+/// Converts a [DraftCard] into an insert companion stored at [position].
 extension DraftCardToCompanion on DraftCard {
-  DraftCardsCompanion toCompanion() => DraftCardsCompanion.insert(
+  DraftCardsCompanion toCompanion(int position) => DraftCardsCompanion.insert(
     id: id,
     source: source,
     sourceRef: sourceRef,
     question: question,
     answer: answer,
     selected: Value(selected),
+    position: position,
   );
 }
 
@@ -86,6 +87,7 @@ extension DraftCardRowToModel on DraftCardRow {
     question: question,
     answer: answer,
     selected: selected,
+    position: position,
   );
 }
 

@@ -1267,6 +1267,17 @@ class $DraftCardsTable extends DraftCards
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1275,6 +1286,7 @@ class $DraftCardsTable extends DraftCards
     question,
     answer,
     selected,
+    position,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1323,6 +1335,14 @@ class $DraftCardsTable extends DraftCards
         selected.isAcceptableOrUnknown(data['selected']!, _selectedMeta),
       );
     }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
     return context;
   }
 
@@ -1358,6 +1378,10 @@ class $DraftCardsTable extends DraftCards
         DriftSqlType.bool,
         data['${effectivePrefix}selected'],
       )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
     );
   }
 
@@ -1377,6 +1401,9 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
   final String question;
   final String answer;
   final bool selected;
+
+  /// Sort key for the Inbox list. Added in schema v2.
+  final int position;
   const DraftCardRow({
     required this.id,
     required this.source,
@@ -1384,6 +1411,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
     required this.question,
     required this.answer,
     required this.selected,
+    required this.position,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1398,6 +1426,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
     map['question'] = Variable<String>(question);
     map['answer'] = Variable<String>(answer);
     map['selected'] = Variable<bool>(selected);
+    map['position'] = Variable<int>(position);
     return map;
   }
 
@@ -1409,6 +1438,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
       question: Value(question),
       answer: Value(answer),
       selected: Value(selected),
+      position: Value(position),
     );
   }
 
@@ -1426,6 +1456,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
       question: serializer.fromJson<String>(json['question']),
       answer: serializer.fromJson<String>(json['answer']),
       selected: serializer.fromJson<bool>(json['selected']),
+      position: serializer.fromJson<int>(json['position']),
     );
   }
   @override
@@ -1440,6 +1471,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
       'question': serializer.toJson<String>(question),
       'answer': serializer.toJson<String>(answer),
       'selected': serializer.toJson<bool>(selected),
+      'position': serializer.toJson<int>(position),
     };
   }
 
@@ -1450,6 +1482,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
     String? question,
     String? answer,
     bool? selected,
+    int? position,
   }) => DraftCardRow(
     id: id ?? this.id,
     source: source ?? this.source,
@@ -1457,6 +1490,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
     question: question ?? this.question,
     answer: answer ?? this.answer,
     selected: selected ?? this.selected,
+    position: position ?? this.position,
   );
   DraftCardRow copyWithCompanion(DraftCardsCompanion data) {
     return DraftCardRow(
@@ -1466,6 +1500,7 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
       question: data.question.present ? data.question.value : this.question,
       answer: data.answer.present ? data.answer.value : this.answer,
       selected: data.selected.present ? data.selected.value : this.selected,
+      position: data.position.present ? data.position.value : this.position,
     );
   }
 
@@ -1477,14 +1512,15 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
           ..write('sourceRef: $sourceRef, ')
           ..write('question: $question, ')
           ..write('answer: $answer, ')
-          ..write('selected: $selected')
+          ..write('selected: $selected, ')
+          ..write('position: $position')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(id, source, sourceRef, question, answer, selected);
+      Object.hash(id, source, sourceRef, question, answer, selected, position);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1494,7 +1530,8 @@ class DraftCardRow extends DataClass implements Insertable<DraftCardRow> {
           other.sourceRef == this.sourceRef &&
           other.question == this.question &&
           other.answer == this.answer &&
-          other.selected == this.selected);
+          other.selected == this.selected &&
+          other.position == this.position);
 }
 
 class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
@@ -1504,6 +1541,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
   final Value<String> question;
   final Value<String> answer;
   final Value<bool> selected;
+  final Value<int> position;
   final Value<int> rowid;
   const DraftCardsCompanion({
     this.id = const Value.absent(),
@@ -1512,6 +1550,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
     this.question = const Value.absent(),
     this.answer = const Value.absent(),
     this.selected = const Value.absent(),
+    this.position = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DraftCardsCompanion.insert({
@@ -1521,12 +1560,14 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
     required String question,
     required String answer,
     this.selected = const Value.absent(),
+    required int position,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        source = Value(source),
        sourceRef = Value(sourceRef),
        question = Value(question),
-       answer = Value(answer);
+       answer = Value(answer),
+       position = Value(position);
   static Insertable<DraftCardRow> custom({
     Expression<String>? id,
     Expression<String>? source,
@@ -1534,6 +1575,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
     Expression<String>? question,
     Expression<String>? answer,
     Expression<bool>? selected,
+    Expression<int>? position,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1543,6 +1585,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
       if (question != null) 'question': question,
       if (answer != null) 'answer': answer,
       if (selected != null) 'selected': selected,
+      if (position != null) 'position': position,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1554,6 +1597,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
     Value<String>? question,
     Value<String>? answer,
     Value<bool>? selected,
+    Value<int>? position,
     Value<int>? rowid,
   }) {
     return DraftCardsCompanion(
@@ -1563,6 +1607,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
       question: question ?? this.question,
       answer: answer ?? this.answer,
       selected: selected ?? this.selected,
+      position: position ?? this.position,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1590,6 +1635,9 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
     if (selected.present) {
       map['selected'] = Variable<bool>(selected.value);
     }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1605,6 +1653,7 @@ class DraftCardsCompanion extends UpdateCompanion<DraftCardRow> {
           ..write('question: $question, ')
           ..write('answer: $answer, ')
           ..write('selected: $selected, ')
+          ..write('position: $position, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3411,6 +3460,7 @@ typedef $$DraftCardsTableCreateCompanionBuilder = DraftCardsCompanion Function({
   required String question,
   required String answer,
   Value<bool> selected,
+  required int position,
   Value<int> rowid,
 });
 typedef $$DraftCardsTableUpdateCompanionBuilder = DraftCardsCompanion Function({
@@ -3420,6 +3470,7 @@ typedef $$DraftCardsTableUpdateCompanionBuilder = DraftCardsCompanion Function({
   Value<String> question,
   Value<String> answer,
   Value<bool> selected,
+  Value<int> position,
   Value<int> rowid,
 });
 
@@ -3462,6 +3513,11 @@ class $$DraftCardsTableFilterComposer
     column: $table.selected,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$DraftCardsTableOrderingComposer
@@ -3502,6 +3558,11 @@ class $$DraftCardsTableOrderingComposer
     column: $table.selected,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DraftCardsTableAnnotationComposer
@@ -3530,6 +3591,9 @@ class $$DraftCardsTableAnnotationComposer
 
   GeneratedColumn<bool> get selected =>
       $composableBuilder(column: $table.selected, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
 }
 
 class $$DraftCardsTableTableManager
@@ -3569,6 +3633,7 @@ class $$DraftCardsTableTableManager
                 Value<String> question = const Value.absent(),
                 Value<String> answer = const Value.absent(),
                 Value<bool> selected = const Value.absent(),
+                Value<int> position = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DraftCardsCompanion(
                 id: id,
@@ -3577,6 +3642,7 @@ class $$DraftCardsTableTableManager
                 question: question,
                 answer: answer,
                 selected: selected,
+                position: position,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3587,6 +3653,7 @@ class $$DraftCardsTableTableManager
                 required String question,
                 required String answer,
                 Value<bool> selected = const Value.absent(),
+                required int position,
                 Value<int> rowid = const Value.absent(),
               }) => DraftCardsCompanion.insert(
                 id: id,
@@ -3595,6 +3662,7 @@ class $$DraftCardsTableTableManager
                 question: question,
                 answer: answer,
                 selected: selected,
+                position: position,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
