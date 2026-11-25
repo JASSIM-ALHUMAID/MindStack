@@ -6,6 +6,7 @@ import '../../application/cards.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import 'common.dart';
+import 'content_text.dart';
 import 'sheet_scaffold.dart';
 
 Future<void> showAddCardSheet(BuildContext context, String deckId) {
@@ -143,21 +144,30 @@ class _CardFormState extends State<CardForm> {
               ],
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _questionController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Question'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Enter a question' : null,
+            // Each field follows the direction of what is typed in it.
+            ValueListenableBuilder(
+              valueListenable: _questionController,
+              builder: (context, value, _) => TextFormField(
+                controller: _questionController,
+                textDirection: textDirectionOf(value.text),
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Question'),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Enter a question' : null,
+              ),
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _answerController,
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(labelText: 'Answer'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Enter an answer' : null,
+            ValueListenableBuilder(
+              valueListenable: _answerController,
+              builder: (context, value, _) => TextFormField(
+                controller: _answerController,
+                textDirection: textDirectionOf(value.text),
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Answer'),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Enter an answer' : null,
+              ),
             ),
             const SizedBox(height: 12),
             Container(

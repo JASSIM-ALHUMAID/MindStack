@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/content_text.dart';
 import '../widgets/edit_draft_sheet.dart';
 
 class InboxScreen extends ConsumerWidget {
@@ -100,7 +101,7 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          '$n ${n == 1 ? 'draft' : 'drafts'} imported from ${deck.deckTitle}',
+          '$n ${n == 1 ? 'draft' : 'drafts'} imported from ${isolateDirection(deck.deckTitle)}',
         ),
       ),
     );
@@ -129,7 +130,7 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
             ),
             for (final deck in decks)
               ListTile(
-                title: Text(deck.title),
+                title: ContentText(deck.title),
                 onTap: () => Navigator.pop(sheetContext, deck.id),
               ),
             Padding(
@@ -157,7 +158,9 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     });
     if (saved) {
       messenger.showSnackBar(
-        SnackBar(content: Text('$count cards saved to $deckTitle')),
+        SnackBar(
+          content: Text('$count cards saved to ${isolateDirection(deckTitle)}'),
+        ),
       );
     }
     if (mounted) setState(() => _busy = false);
@@ -343,7 +346,7 @@ class _DraftTileState extends ConsumerState<_DraftTile> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        draft.sourceRef.toUpperCase(),
+                        isolateDirection(draft.sourceRef.toUpperCase()),
                         style: kMonoMicro,
                       ),
                     ),
@@ -353,9 +356,12 @@ class _DraftTileState extends ConsumerState<_DraftTile> {
                     ),
                   ],
                 ),
-                Text(draft.question, style: kSerifTitle.copyWith(fontSize: 18)),
+                ContentText(
+                  draft.question,
+                  style: kSerifTitle.copyWith(fontSize: 18),
+                ),
                 const SizedBox(height: 4),
-                Text(draft.answer, style: kBodySmall),
+                ContentText(draft.answer, style: kBodySmall),
               ],
             ),
           ),

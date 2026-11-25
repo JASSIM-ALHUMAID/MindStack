@@ -8,6 +8,7 @@ import '../../core/dates.dart';
 import '../../theme/app_theme.dart';
 import '../format.dart';
 import '../save_feedback.dart';
+import 'content_text.dart';
 import 'sheet_scaffold.dart';
 
 Future<void> showCreateCourseSheet(BuildContext context) {
@@ -93,16 +94,20 @@ class _CreateCourseSheetState extends ConsumerState<_CreateCourseSheet> {
             const SizedBox(height: 4),
             const Text('Create Course', style: kSerifTitle),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _titleController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Course title',
-                hintText: 'e.g. SWE463 - Mobile Development',
+            ValueListenableBuilder(
+              valueListenable: _titleController,
+              builder: (context, current, _) => TextFormField(
+                controller: _titleController,
+                textDirection: textDirectionOf(current.text),
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Course title',
+                  hintText: 'e.g. SWE463 - Mobile Development',
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Enter a course title'
+                    : null,
               ),
-              validator: (value) => (value == null || value.trim().isEmpty)
-                  ? 'Enter a course title'
-                  : null,
             ),
             const SizedBox(height: 12),
             TextFormField(

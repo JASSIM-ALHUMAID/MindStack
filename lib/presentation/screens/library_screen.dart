@@ -15,6 +15,7 @@ import '../../route_names.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/content_text.dart';
 import '../widgets/create_course_sheet.dart';
 import '../widgets/create_deck_sheet.dart';
 
@@ -123,7 +124,7 @@ class _CourseCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
+                child: ContentText(
                   course.title,
                   style: kSerifTitle.copyWith(fontSize: 20),
                 ),
@@ -189,7 +190,7 @@ class _DeckRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(deck.title, style: const TextStyle(fontSize: 16)),
+                  ContentText(deck.title, style: const TextStyle(fontSize: 16)),
                   Text(
                     '$count ${count == 1 ? 'CARD' : 'CARDS'}',
                     style: kMonoLabel,

@@ -22,6 +22,7 @@ import '../widgets/add_card_sheet.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/content_text.dart';
 import '../widgets/edit_card_sheet.dart';
 
 class DeckEditorScreen extends ConsumerWidget {
@@ -164,7 +165,7 @@ class _DeckEditorState extends ConsumerState<_DeckEditor> {
               '${cards.length} ${cards.length == 1 ? 'CARD' : 'CARDS'}',
               style: kMonoLabel,
             ),
-            Text(deck.title, style: kSerifTitle.copyWith(fontSize: 22)),
+            ContentText(deck.title, style: kSerifTitle.copyWith(fontSize: 22)),
           ],
         ),
         actions: [
@@ -289,13 +290,14 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(
-              'All cards from "${deck.title}" move to the deck you pick.',
+              'All cards from "${isolateDirection(deck.title)}" move to the '
+              'deck you pick.',
               style: const TextStyle(color: AppColors.muted),
             ),
           ),
           for (final d in others)
             ListTile(
-              title: Text(d.title),
+              title: ContentText(d.title),
               onTap: () => Navigator.pop(sheetContext, d),
             ),
           Padding(
@@ -315,13 +317,15 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
   if (target == null || !context.mounted) return;
 
   final count = ref.read(deckCardsProvider(deck.id)).valueOrNull?.length ?? 0;
+  final from = isolateDirection(deck.title);
+  final into = isolateDirection(target.title);
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Merge decks?'),
       content: Text(
-        'Move $count cards from "${deck.title}" into "${target.title}". '
-        '"${deck.title}" will be removed. Review history is kept.',
+        'Move $count cards from "$from" into "$into". '
+        '"$from" will be removed. Review history is kept.',
       ),
       actions: [
         TextButton(
@@ -345,7 +349,7 @@ Future<void> _mergeDeck(BuildContext context, WidgetRef ref, Deck deck) async {
     context,
     ref,
     () => commands.mergeDecks(fromId: deck.id, toId: target.id),
-    success: 'Merged "${deck.title}" into "${target.title}"',
+    success: 'Merged "$from" into "$into"',
   );
   if (saved) router.pop();
 }
@@ -367,7 +371,9 @@ class _CardTileState extends ConsumerState<_CardTile> {
     final confirmed = await confirmDelete(
       context,
       title: 'Delete card?',
-      what: '"${widget.card.question}" and its review history will be removed.',
+      what:
+          '"${isolateDirection(widget.card.question)}" and its review history '
+          'will be removed.',
     );
     if (!confirmed || !mounted) return;
     setState(() => _deleting = true);
@@ -422,9 +428,12 @@ class _CardTileState extends ConsumerState<_CardTile> {
             ],
           ),
           const SizedBox(height: 6),
-          Text(card.question, style: kSerifTitle.copyWith(fontSize: 18)),
+          ContentText(card.question, style: kSerifTitle.copyWith(fontSize: 18)),
           const SizedBox(height: 4),
-          Text(card.answer, style: const TextStyle(color: AppColors.ink)),
+          ContentText(
+            card.answer,
+            style: const TextStyle(color: AppColors.ink),
+          ),
           const Divider(height: 20),
           Row(
             children: [

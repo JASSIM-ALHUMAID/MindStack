@@ -12,6 +12,7 @@ import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/content_text.dart';
 
 class QuizScreen extends ConsumerWidget {
   const QuizScreen({super.key});
@@ -200,7 +201,7 @@ class QuizScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
+                        child: ContentText(
                           quiz.questions[i].prompt,
                           style: kSerifTitle.copyWith(fontSize: 17),
                         ),
@@ -209,7 +210,7 @@ class QuizScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  ContentText(
                     quiz.questions[i].options[quiz.questions[i].correctIndex],
                     style: kBodySmall,
                   ),
@@ -302,7 +303,7 @@ class QuizScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(q.prompt, style: kSerifTitle.copyWith(fontSize: 22)),
+              ContentText(q.prompt, style: kSerifTitle.copyWith(fontSize: 22)),
               const SizedBox(height: 12),
               for (var i = 0; i < q.options.length; i++) ...[
                 _OptionTile(
@@ -425,7 +426,7 @@ class _OptionTile extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(text, style: TextStyle(color: ink)),
+              child: ContentText(text, style: TextStyle(color: ink)),
             ),
             if (state == _OptionState.correct)
               const Icon(LucideIcons.check, color: Colors.white),
