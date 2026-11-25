@@ -42,7 +42,8 @@ final class InboxCommands {
   Future<void> deleteDraft(String id) =>
       _ref.read(draftRepositoryProvider).delete([id]);
 
-  /// Undoes [deleteDraft]. The draft returns at the end of the list.
+  /// Undoes [deleteDraft]. A draft read from [draftsProvider] keeps its
+  /// position, so it returns to the place it was deleted from.
   Future<void> restoreDraft(DraftCard draft) =>
       _ref.read(draftRepositoryProvider).insertAll([draft]);
 

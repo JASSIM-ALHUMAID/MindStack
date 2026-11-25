@@ -8,7 +8,7 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-/// The MindStack SQLite database (schema v1).
+/// The MindStack SQLite database (schema v2).
 ///
 /// Integrity is enforced by the store: foreign keys with cascading deletes,
 /// CHECK constraints, a case-insensitive unique deck title per course and
@@ -22,11 +22,25 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        // v2 adds draft_cards.position. SQLite cannot add a NOT NULL column
+        // without a default, so the table is rebuilt; old drafts keep their
+        // order because position is filled from rowid.
+        await m.alterTable(
+          TableMigration(
+            draftCards,
+            columnTransformer: {draftCards.position: draftCards.rowId},
+            newColumns: [draftCards.position],
+          ),
+        );
+      }
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },

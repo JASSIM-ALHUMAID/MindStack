@@ -7,36 +7,46 @@ import '../database/app_database.dart';
 import '../failure_mapping.dart';
 import '../mappers.dart';
 
-/// [DraftRepository] backed by drift. Drafts are listed in insertion order.
+/// [DraftRepository] backed by drift. Drafts are listed by position.
 final class DriftDraftRepository implements DraftRepository {
   /// Creates a repository reading and writing [_db].
   const DriftDraftRepository(this._db);
 
   final AppDatabase _db;
 
-  SimpleSelectStatement<$DraftCardsTable, DraftCardRow> _byInsertion() =>
-      _db.select(_db.draftCards)..orderBy([(t) => OrderingTerm.asc(t.rowId)]);
+  // rowid breaks a tie, which only happens when a restored draft and a newer
+  // one took the same freed position.
+  SimpleSelectStatement<$DraftCardsTable, DraftCardRow> _ordered() =>
+      _db.select(_db.draftCards)..orderBy([
+        (t) => OrderingTerm.asc(t.position),
+        (t) => OrderingTerm.asc(t.rowId),
+      ]);
 
   @override
   Stream<List<DraftCard>> watchAll() => guardStream(
-    _byInsertion().watch().map((rows) => [for (final r in rows) r.toModel()]),
+    _ordered().watch().map((rows) => [for (final r in rows) r.toModel()]),
   );
 
   @override
   Future<List<DraftCard>> selected() => guard(() async {
-    final query = _byInsertion()..where((t) => t.selected.equals(true));
+    final query = _ordered()..where((t) => t.selected.equals(true));
     return [for (final r in await query.get()) r.toModel()];
   });
 
   @override
   Future<void> insertAll(List<DraftCard> drafts) => guard(
-    () => _db.transaction(
-      () => _db.batch(
+    () => _db.transaction(() async {
+      final maxPosition = _db.draftCards.position.max();
+      final last = await (_db.selectOnly(
+        _db.draftCards,
+      )..addColumns([maxPosition])).map((r) => r.read(maxPosition)).getSingle();
+      var next = (last ?? 0) + 1;
+      await _db.batch(
         (b) => b.insertAll(_db.draftCards, [
-          for (final d in drafts) d.toCompanion(),
+          for (final d in drafts) d.toCompanion(d.position ?? next++),
         ]),
-      ),
-    ),
+      );
+    }),
   );
 
   @override

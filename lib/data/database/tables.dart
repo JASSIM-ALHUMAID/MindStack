@@ -87,6 +87,9 @@ class DraftCards extends Table {
   TextColumn get answer => text()();
   BoolColumn get selected => boolean().withDefault(const Constant(true))();
 
+  /// Sort key for the Inbox list. Added in schema v2.
+  IntColumn get position => integer()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

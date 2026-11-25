@@ -184,7 +184,7 @@ void main() {
     });
   });
 
-  testWidgets('swiping a draft deletes it and Undo restores it', (
+  testWidgets('swiping a draft deletes it and Undo restores it in place', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 3000);
@@ -192,7 +192,7 @@ void main() {
     addTearDown(tester.view.reset);
     final container = makeContainer();
     await container.read(draftRepositoryProvider).insertAll([
-      for (final id in ['d1', 'd2'])
+      for (final id in ['d1', 'd2', 'd3'])
         DraftCard(
           id: id,
           source: CardSource.shared,
@@ -203,24 +203,28 @@ void main() {
     ]);
     await pumpInApp(tester, container, const InboxScreen());
     await tester.pumpAndSettle();
-    expect(find.text('Save selected (2) to a deck'), findsOneWidget);
+    expect(find.text('Save selected (3) to a deck'), findsOneWidget);
 
-    await tester.drag(find.text('Question d1'), const Offset(-600, 0));
+    await tester.drag(find.text('Question d2'), const Offset(-600, 0));
     await tester.pumpAndSettle();
 
-    expect(find.text('Question d1'), findsNothing);
+    expect(find.text('Question d2'), findsNothing);
     expect(find.text('Draft deleted'), findsOneWidget);
-    expect(find.text('Save selected (1) to a deck'), findsOneWidget);
+    expect(find.text('Save selected (2) to a deck'), findsOneWidget);
     var stored = await container.read(draftsProvider.future);
-    expect([for (final d in stored) d.id], ['d2']);
+    expect([for (final d in stored) d.id], ['d1', 'd3']);
 
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Question d1'), findsOneWidget);
-    expect(find.text('Save selected (2) to a deck'), findsOneWidget);
+    expect(find.text('Save selected (3) to a deck'), findsOneWidget);
     stored = await container.read(draftsProvider.future);
-    expect(stored, hasLength(2));
+    expect([for (final d in stored) d.id], ['d1', 'd2', 'd3']);
+    final top = [
+      for (final id in ['d1', 'd2', 'd3'])
+        tester.getTopLeft(find.text('Question $id')).dy,
+    ];
+    expect(top[0] < top[1] && top[1] < top[2], isTrue, reason: '$top');
   });
 
   testWidgets('EDIT validates and saves the draft text', (tester) async {
