@@ -26,7 +26,8 @@ class ReviewScreen extends ConsumerStatefulWidget {
   ConsumerState<ReviewScreen> createState() => _ReviewScreenState();
 }
 
-class _ReviewScreenState extends ConsumerState<ReviewScreen> {
+class _ReviewScreenState extends ConsumerState<ReviewScreen>
+    with WidgetsBindingObserver {
   // Temporary UI detail owned by this screen only, so plain setState is enough.
   // Revealing an answer belongs to one card in one session. A fresh session
   // must hide it even when its first card has the same id as before.
@@ -36,9 +37,26 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   String? _lastSpokenKey;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_stopTts());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final review = ref.read(reviewProvider.notifier);
+    if (state == AppLifecycleState.resumed) {
+      review.resume();
+    } else {
+      review.pause();
+    }
   }
 
   Future<void> _stopTts() async {
@@ -488,7 +506,7 @@ class _SessionComplete extends ConsumerWidget {
                     if (review.cardIds.isEmpty) {
                       unawaited(notifier.start());
                     } else {
-                      notifier.restart();
+                      unawaited(notifier.restart());
                     }
                   },
                   icon: const Icon(LucideIcons.rotateCcw),

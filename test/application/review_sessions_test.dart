@@ -152,13 +152,59 @@ void main() {
     await c.read(reviewProvider.future);
     final notifier = c.read(reviewProvider.notifier);
     clock.advance(const Duration(minutes: 3));
-    notifier.restart();
+    await notifier.restart();
     clock.advance(const Duration(seconds: 2));
 
     await notifier.rate(Rating.good);
 
     final logs = await c.read(reviewLogRepositoryProvider).watchAll().first;
     expect(logs.single.elapsedMs, 2000);
+  });
+
+  test('time in the background is not counted', () async {
+    final clock = FixedClock(_now);
+    final c = makeContainer(clock: clock);
+    final deck = await _deck(c, 'A');
+    await _card(c, deck, 'A');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+
+    clock.advance(const Duration(seconds: 2));
+    notifier.pause();
+    clock.advance(const Duration(minutes: 5));
+    notifier.pause();
+    clock.advance(const Duration(minutes: 5));
+    notifier.resume();
+    clock.advance(const Duration(seconds: 1));
+    notifier.resume();
+    await notifier.rate(Rating.good);
+
+    final logs = await c.read(reviewLogRepositoryProvider).watchAll().first;
+    expect(logs.single.elapsedMs, 3000);
+  });
+
+  test('a card that appears while paused is timed from resume', () async {
+    final clock = FixedClock(_now);
+    final c = makeContainer(clock: clock);
+    final deck = await _deck(c, 'A');
+    final a = await _card(c, deck, 'A');
+    final b = await _card(c, deck, 'B');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+    await notifier.start(cardIds: [a, b]);
+
+    clock.advance(const Duration(seconds: 4));
+    notifier.pause();
+    clock.advance(const Duration(minutes: 1));
+    // Rated while paused: only the time before the pause counts.
+    await notifier.rate(Rating.good);
+    clock.advance(const Duration(minutes: 1));
+    notifier.resume();
+    clock.advance(const Duration(seconds: 2));
+    await notifier.rate(Rating.good);
+
+    final logs = await c.read(reviewLogRepositoryProvider).watchAll().first;
+    expect(logs.map((log) => log.elapsedMs), [4000, 2000]);
   });
 
   test('skipping a deleted card resets the timer without logging it', () async {
