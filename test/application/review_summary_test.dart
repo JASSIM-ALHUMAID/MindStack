@@ -141,7 +141,7 @@ void main() {
       await notifier.rate(Rating.good);
       final previousSession = c.read(reviewProvider).requireValue.sessionId;
 
-      notifier.restart();
+      await notifier.restart();
       var state = c.read(reviewProvider).requireValue;
       expect(state.results, isEmpty);
       expect(state.sessionId, isNot(previousSession));

@@ -208,17 +208,64 @@ void main() {
     expect(state.requireValue.saving, isFalse);
   });
 
-  test('restart returns to the first card', () async {
-    final c = makeContainer(clock: FixedClock(_now));
+  test('restart leaves out cards that are no longer due', () async {
+    final clock = FixedClock(_now);
+    final c = makeContainer(clock: clock);
     final deck = await _deck(c);
-    await _card(c, deck, question: 'q');
+    final good = await _card(c, deck, question: 'good');
+    final easy = await _card(c, deck, question: 'easy');
+    final again = await _card(c, deck, question: 'again');
     await c.read(reviewProvider.future);
     final notifier = c.read(reviewProvider.notifier);
+    expect(c.read(reviewProvider).requireValue.cardIds, [good, easy, again]);
+    await notifier.rate(Rating.good);
+    await notifier.rate(Rating.easy);
+    await notifier.rate(Rating.again);
+
+    await notifier.restart();
+    expect(c.read(reviewProvider).requireValue.cardIds, isEmpty);
+
+    // Again brings a card back after ten minutes.
+    clock.advance(const Duration(minutes: 10));
+    await notifier.restart();
+    final state = c.read(reviewProvider).requireValue;
+    expect(state.cardIds, [again]);
+    expect(state.index, 0);
+    expect(state.results, isEmpty);
+  });
+
+  test('restart of a deck session stays in that deck', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final a = await _deck(c, 'A');
+    final b = await _deck(c, 'B');
+    final rated = await _card(c, a, question: 'a1');
+    final left = await _card(c, a, question: 'a2');
+    await _card(c, b, question: 'b1');
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+    await notifier.startDeck(a);
+    expect(c.read(reviewProvider).requireValue.cardIds, [rated, left]);
     await notifier.rate(Rating.good);
 
-    notifier.restart();
+    await notifier.restart();
 
-    expect(c.read(reviewProvider).requireValue.index, 0);
+    expect(c.read(reviewProvider).requireValue.cardIds, [left]);
+  });
+
+  test('restart of a weak drill picks the weakest cards again', () async {
+    final c = makeContainer(clock: FixedClock(_now));
+    final deck = await _deck(c);
+    final weakest = await _card(c, deck, question: 'w', mastery: 0.1);
+    final next = await _card(c, deck, question: 'n', mastery: 0.2);
+    await c.read(reviewProvider.future);
+    final notifier = c.read(reviewProvider.notifier);
+    await notifier.startWeak(count: 1);
+    expect(c.read(reviewProvider).requireValue.cardIds, [weakest]);
+    await notifier.rate(Rating.easy);
+
+    await notifier.restart();
+
+    expect(c.read(reviewProvider).requireValue.cardIds, [next]);
   });
 
   test('startDeck queues only due cards in that deck', () async {
