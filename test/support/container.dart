@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mindstack/application/core_providers.dart';
+import 'package:mindstack/application/ocr.dart';
 import 'package:mindstack/application/services.dart';
 import 'package:mindstack/core/clock.dart';
 import 'package:mindstack/core/ids.dart';
 import 'package:mindstack/data/database/app_database.dart';
+import 'package:mindstack/domain/text_recognizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes.dart';
@@ -19,6 +21,7 @@ ProviderContainer makeContainer({
   AppDatabase? db,
   Clock? clock,
   IdGenerator? ids,
+  TextRecognizer? recognizer,
   List<Override> overrides = const [],
   Map<String, Object> initialPreferences = const {},
 }) {
@@ -36,6 +39,8 @@ ProviderContainer makeContainer({
       ),
       idGeneratorProvider.overrideWithValue(ids ?? SequentialIds()),
       loggerProvider.overrideWithValue(RecordingLogger()),
+      if (recognizer != null)
+        textRecognizerFactoryProvider.overrideWithValue(() => recognizer),
       ...overrides,
     ],
   );

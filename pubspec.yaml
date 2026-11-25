@@ -24,6 +24,7 @@ dependencies:
   file_picker: ^13.3.3
   share_plus: ^13.3.1
   flutter_tts: ^4.2.3
+  google_mlkit_text_recognition: ^1.0.3
 
 dev_dependencies:
   flutter_test:

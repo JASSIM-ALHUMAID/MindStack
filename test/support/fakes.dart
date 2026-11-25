@@ -7,6 +7,7 @@ import 'package:mindstack/core/clock.dart';
 import 'package:mindstack/core/ids.dart';
 import 'package:mindstack/core/logger.dart';
 import 'package:mindstack/domain/deck_file_picker.dart';
+import 'package:mindstack/domain/text_recognizer.dart';
 
 /// A [Clock] frozen at a chosen instant that tests can move forward.
 final class FixedClock implements Clock {
@@ -97,4 +98,39 @@ final class FakeDeckFilePicker implements DeckFilePicker {
     picks++;
     return _files.isEmpty ? null : _files.removeAt(0);
   }
+}
+
+/// A [TextRecognizer] that returns queued results and records calls
+final class FakeTextRecognizer implements TextRecognizer {
+  FakeTextRecognizer([List<Object> results = const []])
+    : _results = [...results];
+
+  final List<Object> _results;
+
+  /// Paths passed to [recognizeText], in call order
+  final List<String> paths = [];
+
+  /// Holds every call until completed; set it to test loading states
+  Completer<void>? gate;
+
+  int closes = 0;
+
+  void queue(RecognitionResult result) => _results.add(result);
+
+  void queueError(Object error) => _results.add(error);
+
+  @override
+  Future<RecognitionResult> recognizeText(String imagePath) async {
+    paths.add(imagePath);
+    await gate?.future;
+    if (_results.isEmpty) {
+      return const RecognitionFailure(RecognitionFailureKind.noText);
+    }
+    final next = _results.removeAt(0);
+    if (next is RecognitionResult) return next;
+    Error.throwWithStackTrace(next, StackTrace.current);
+  }
+
+  @override
+  Future<void> close() async => closes++;
 }
