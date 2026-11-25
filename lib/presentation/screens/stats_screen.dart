@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../format.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/content_text.dart';
 
 class StatsScreen extends ConsumerStatefulWidget {
   const StatsScreen({super.key});
@@ -388,7 +389,7 @@ class _WeakestSection extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                Expanded(child: Text(card.question)),
+                Expanded(child: ContentText(card.question)),
                 const SizedBox(width: 8),
                 PillLabel('${(card.mastery * 100).round()}% · weak'),
               ],
@@ -466,7 +467,7 @@ class _MasteryChart extends StatelessWidget {
                 meta: meta,
                 child: SizedBox(
                   width: 64,
-                  child: Text(
+                  child: ContentText(
                     labels[value.toInt()],
                     maxLines: 2,
                     textAlign: TextAlign.center,

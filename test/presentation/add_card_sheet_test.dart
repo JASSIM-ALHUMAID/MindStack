@@ -124,4 +124,28 @@ void main() {
     expect(find.text('Enter a question'), findsOneWidget);
     expect(find.text('Enter an answer'), findsOneWidget);
   });
+
+  testWidgets('a field turns right to left when Arabic is typed', (
+    tester,
+  ) async {
+    final container = makeContainer();
+    await container.read(appStartupProvider.future);
+    await pumpInApp(tester, container, _opener('any'));
+    await tester.tap(find.text('open sheet'));
+    await tester.pumpAndSettle();
+    final question = find.widgetWithText(TextFormField, 'Question');
+    TextDirection? direction() => tester
+        .widget<EditableText>(
+          find.descendant(of: question, matching: find.byType(EditableText)),
+        )
+        .textDirection;
+
+    expect(direction(), isNull, reason: 'empty: follows the app');
+    await tester.enterText(question, 'ما هو الـ Widget؟');
+    await tester.pump();
+    expect(direction(), TextDirection.rtl);
+    await tester.enterText(question, 'What is a Widget?');
+    await tester.pump();
+    expect(direction(), TextDirection.ltr);
+  });
 }

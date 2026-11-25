@@ -133,6 +133,43 @@ void main() {
       expect(find.text('Save selected (5) to a deck'), findsOneWidget);
     });
 
+    testWidgets('Arabic drafts read right to left', (tester) async {
+      await pumpInbox(tester, [
+        FakeDeckFile.fixture('valid/05_unicode_and_long_text.mindstack'),
+      ]);
+
+      await tester.tap(find.text(importLink));
+      await tester.pumpAndSettle();
+
+      const arabic = 'ما هو الـ Widget في Flutter؟';
+      const english =
+          'Edge case: a very long answer that should wrap and truncate '
+          'cleanly in a draft card?';
+      expect(
+        tester.widget<Text>(find.text(arabic)).textDirection,
+        TextDirection.rtl,
+      );
+      expect(
+        tester.widget<Text>(find.text(english)).textDirection,
+        TextDirection.ltr,
+      );
+      // Both end at the card's right edge; the short Arabic line starts later.
+      expect(
+        tester.getTopRight(find.text(arabic)).dx,
+        closeTo(tester.getTopRight(find.text(english)).dx, 1),
+      );
+      expect(
+        tester.getTopLeft(find.text(arabic)).dx,
+        greaterThan(tester.getTopLeft(find.text(english)).dx),
+      );
+      // The Arabic deck title inside English lines keeps its own order.
+      final title =
+          '${String.fromCharCode(0x2068)}مراجعة · Unicode & long text'
+          '${String.fromCharCode(0x2069)}';
+      expect(find.text('3 drafts imported from $title'), findsOneWidget);
+      expect(find.text(title.toUpperCase()), findsNWidgets(3));
+    });
+
     testWidgets('shows the loading state while the file is read', (
       tester,
     ) async {

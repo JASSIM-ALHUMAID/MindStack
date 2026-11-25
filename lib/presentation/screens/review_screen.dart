@@ -18,6 +18,7 @@ import '../format.dart';
 import '../save_feedback.dart';
 import '../widgets/async_value_view.dart';
 import '../widgets/common.dart';
+import '../widgets/content_text.dart';
 
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key});
@@ -259,7 +260,7 @@ class _CardView extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                'DECK: ${deckTitle.toUpperCase()}',
+                'DECK: ${isolateDirection(deckTitle.toUpperCase())}',
                 style: kMonoMicro,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -281,13 +282,13 @@ class _CardView extends ConsumerWidget {
                 children: [
                   Text(showAnswer ? 'ANSWER' : 'QUESTION', style: kMonoLabel),
                   const SizedBox(height: 12),
-                  Text(
+                  ContentText(
                     card.question,
                     style: kSerifTitle.copyWith(fontSize: 24),
                   ),
                   if (showAnswer) ...[
                     const SizedBox(height: 12),
-                    Text(
+                    ContentText(
                       card.answer,
                       style: const TextStyle(fontSize: 16, height: 1.5),
                     ),
@@ -535,9 +536,9 @@ class _SessionComplete extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(c.question),
+                            ContentText(c.question),
                             Text(
-                              '${decks.where((d) => d.id == c.deckId).firstOrNull?.title ?? ''}'
+                              '${isolateDirection(decks.where((d) => d.id == c.deckId).firstOrNull?.title ?? '')}'
                               ' · Interval ${c.intervalDays}d',
                               style: kMonoMicro,
                             ),

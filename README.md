@@ -49,7 +49,6 @@ All data is local. Courses, decks, cards, Inbox drafts, and review logs are stor
 
 - Stats shows an empty state when there is no review history yet.
 - The native share sheet is platform-owned and should be verified on Android; exported `.mindstack` content is covered by parser/encoder tests.
-- Arabic (right-to-left) text displays in the wrong order.
 - OCR reads Latin script only.
 - Reminder notifications are not implemented yet; TTS speech is implemented and opt-in during Review.
 

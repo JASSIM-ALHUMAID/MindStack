@@ -9,6 +9,7 @@ import '../../domain/models/course.dart';
 import '../../route_names.dart';
 import '../../theme/app_theme.dart';
 import '../save_feedback.dart';
+import 'content_text.dart';
 import 'sheet_scaffold.dart';
 
 /// Bottom sheet that adds an empty deck to [course], then opens it in the
@@ -77,24 +78,28 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'NEW DECK · ${widget.course.title.toUpperCase()}',
+              'NEW DECK · ${isolateDirection(widget.course.title.toUpperCase())}',
               style: kMonoLabel,
             ),
             const SizedBox(height: 4),
             const Text('Create Deck', style: kSerifTitle),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _titleController,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => unawaited(_save()),
-              decoration: const InputDecoration(
-                labelText: 'Deck title',
-                hintText: 'e.g. State management',
+            ValueListenableBuilder(
+              valueListenable: _titleController,
+              builder: (context, current, _) => TextFormField(
+                controller: _titleController,
+                textDirection: textDirectionOf(current.text),
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => unawaited(_save()),
+                decoration: const InputDecoration(
+                  labelText: 'Deck title',
+                  hintText: 'e.g. State management',
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Enter a deck title'
+                    : null,
               ),
-              validator: (value) => (value == null || value.trim().isEmpty)
-                  ? 'Enter a deck title'
-                  : null,
             ),
             const SizedBox(height: 20),
             SizedBox(
