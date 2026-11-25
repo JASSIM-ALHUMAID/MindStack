@@ -50,7 +50,6 @@ All data is local. Courses, decks, cards, Inbox drafts, and review logs are stor
 - Review again repeats the previous queue. Timing does not pause while the app is in the background.
 - Stats shows an empty state when there is no review history yet.
 - The native share sheet is platform-owned and should be verified on Android; exported `.mindstack` content is covered by parser/encoder tests.
-- Undoing a draft delete puts it at the end of the list.
 - Arabic (right-to-left) text displays in the wrong order.
 - Reminder notifications are not implemented yet; TTS speech is implemented and opt-in during Review.
 
