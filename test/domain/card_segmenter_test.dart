@@ -89,7 +89,101 @@ void main() {
         const [
           CardSegment(
             question: 'Which is correct?\nA. First\nB. Second',
-            answer: 'B',
+            answer: 'B. Second',
+          ),
+        ],
+      );
+    });
+
+    test('an MCQ answer letter maps to the chosen choice', () {
+      expect(
+        segment(
+          'Which of the following is a programming language?\n'
+          'A. HTML\nB. Python\nC. CSS\nAnswer: B',
+        ),
+        const [
+          CardSegment(
+            question:
+                'Which of the following is a programming language?\n'
+                'A. HTML\nB. Python\nC. CSS',
+            answer: 'B. Python',
+          ),
+        ],
+      );
+    });
+
+    test('a four-choice MCQ maps the last choice', () {
+      expect(
+        segment(
+          'Which number is even?\n'
+          'A. 3\nB. 5\nC. 7\nD. 8\nanswer: d',
+        ),
+        const [
+          CardSegment(
+            question: 'Which number is even?\nA. 3\nB. 5\nC. 7\nD. 8',
+            answer: 'D. 8',
+          ),
+        ],
+      );
+    });
+
+    test('MCQ choices can cross block boundaries', () {
+      expect(
+        const CardSegmenter().segment(const [
+          RecognizedBlock('Which is a markup language?'),
+          RecognizedBlock('A. HTML'),
+          RecognizedBlock('B. Python'),
+          RecognizedBlock('Answer: A'),
+        ]),
+        const [
+          CardSegment(
+            question: 'Which is a markup language?\nA. HTML\nB. Python',
+            answer: 'A. HTML',
+          ),
+        ],
+      );
+    });
+
+    test('lowercase MCQ choices map too', () {
+      expect(
+        segment(
+          'Which is a markup language?\n'
+          'a) HTML\nb) Python\nAnswer: b',
+        ),
+        const [
+          CardSegment(
+            question: 'Which is a markup language?\na) HTML\nb) Python',
+            answer: 'b) Python',
+          ),
+        ],
+      );
+    });
+
+    test('an explicit MCQ answer text is kept', () {
+      expect(
+        segment(
+          'Which is a markup language?\n'
+          'A. HTML\nB. Python\nAnswer: HTML',
+        ),
+        const [
+          CardSegment(
+            question: 'Which is a markup language?\nA. HTML\nB. Python',
+            answer: 'HTML',
+          ),
+        ],
+      );
+    });
+
+    test('an answer letter outside the choices stays raw', () {
+      expect(
+        segment(
+          'Which is a markup language?\n'
+          'A. HTML\nB. Python\nAnswer: E',
+        ),
+        const [
+          CardSegment(
+            question: 'Which is a markup language?\nA. HTML\nB. Python',
+            answer: 'E',
           ),
         ],
       );

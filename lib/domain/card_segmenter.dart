@@ -24,13 +24,15 @@ class CardSegment {
 
 /// Turns recognised text into question/answer cards.
 ///
-/// Only two shapes become cards:
-/// 1. Explicit labels: `Q:`/`Question:` followed by `A:`/`Answer:`.
+/// A card needs a clear prompt:
+/// 1. `Q:`/`Question:` followed by `A:`/`Answer:`.
 /// 2. A question line ending in `?` followed by body lines.
+/// 3. Up to four choices A-D followed by an `Answer:`/`answer:` line.
 ///
 /// Headings, bullets without a question and plain paragraphs are ignored:
-/// they do not give a card a prompt, so the draft would be noise. A run of
-/// multiple-choice options belongs to the question, never to the answer.
+/// they do not give a card a prompt, so the draft would be noise. MCQ
+/// choices belong to the question; a bare answer letter resolves to the
+/// matching choice line.
 final class CardSegmenter {
   const CardSegmenter();
 
@@ -54,7 +56,9 @@ final class CardSegmenter {
     caseSensitive: false,
   );
   static final _punctuatedNumber = RegExp(r'^\d{1,4}[.)]$');
-  static final _option = RegExp(r'^\(?[A-Ea-e][.)]\s+\S');
+  static final _option = RegExp(r'^\(?[A-Da-d][.)]\s+\S');
+  static final _optionLabel = RegExp(r'^\(?([A-Da-d])[.)]');
+  static final _bareAnswerLetter = RegExp(r'^\(?([A-Da-d])[.)]?\s*$');
   static final _questionStart = RegExp(
     r'^(?:what|why|how|when|where|who|whom|whose|which|explain|define|describe|list|name|give|state|calculate)\b',
     caseSensitive: false,
@@ -91,18 +95,20 @@ final class CardSegmenter {
     final emitted = <String>{};
     String? question;
     final answer = <String>[];
+    final options = <String, String>{};
     var collectingQuestion = false;
     var collectingAnswer = false;
     var answerFromLabel = false;
 
     void flush() {
       final q = question?.trim() ?? '';
-      final a = answer.join('\n').trim();
+      final a = _resolveAnswer(answer, options);
       if (q.isNotEmpty && a.isNotEmpty && emitted.add('$q\u0000$a')) {
         segments.add(CardSegment(question: q, answer: a));
       }
       question = null;
       answer.clear();
+      options.clear();
       collectingQuestion = false;
       collectingAnswer = false;
       answerFromLabel = false;
@@ -116,6 +122,10 @@ final class CardSegmenter {
       if (line.isOption) {
         final current = question;
         if (current == null) continue;
+        final label = _optionLabel.firstMatch(line.text);
+        if (label != null) {
+          options[label.group(1)!.toUpperCase()] = line.text;
+        }
         question = current.isEmpty ? line.text : '$current\n${line.text}';
         continue;
       }
@@ -131,7 +141,8 @@ final class CardSegmenter {
       final answerLabel = _answerLabel.firstMatch(line.text);
       if (answerLabel != null) {
         if (question == null) continue;
-        answer.add(line.text.substring(answerLabel.end).trim());
+        final text = line.text.substring(answerLabel.end).trim();
+        if (text.isNotEmpty) answer.add(text);
         collectingQuestion = false;
         collectingAnswer = true;
         answerFromLabel = true;
@@ -179,18 +190,22 @@ final class CardSegmenter {
     return segments;
   }
 
-  /// True when the option at [index] belongs to a run of at least two in
-  /// the same block.
+  /// An option counts only when another option is adjacent
   bool _inOptionRun(List<({String text, int block})> lines, int index) {
-    final line = lines[index];
-    if (!_option.hasMatch(line.text)) return false;
-    final before = index > 0 &&
-        lines[index - 1].block == line.block &&
-        _option.hasMatch(lines[index - 1].text);
+    if (!_option.hasMatch(lines[index].text)) return false;
+    final before = index > 0 && _option.hasMatch(lines[index - 1].text);
     final after = index + 1 < lines.length &&
-        lines[index + 1].block == line.block &&
         _option.hasMatch(lines[index + 1].text);
     return before || after;
+  }
+
+  /// Resolves a bare MCQ answer letter to its choice line
+  String _resolveAnswer(List<String> answer, Map<String, String> options) {
+    final raw = answer.join('\n').trim();
+    if (answer.length != 1 || options.isEmpty) return raw;
+    final match = _bareAnswerLetter.firstMatch(raw);
+    if (match == null) return raw;
+    return options[match.group(1)!.toUpperCase()] ?? raw;
   }
 
   /// Normalises [raw] and returns null for blank lines and page furniture
