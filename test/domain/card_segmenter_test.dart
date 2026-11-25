@@ -72,6 +72,28 @@ void main() {
         isEmpty,
       );
     });
+
+    test('unlabelled multiple-choice options are not an answer', () {
+      expect(
+        segment(
+          'Which of the following is a programming language?\n'
+          'A. Python\nB. HTML\nC. CSS',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a labelled multiple-choice answer keeps options in the question', () {
+      expect(
+        segment('Q: Which is correct?\nA. First\nB. Second\nAnswer: B'),
+        const [
+          CardSegment(
+            question: 'Which is correct?\nA. First\nB. Second',
+            answer: 'B',
+          ),
+        ],
+      );
+    });
   });
 
   group('question lines', () {
@@ -128,6 +150,50 @@ void main() {
         ],
       );
     });
+
+    test('a question mark inside a labelled answer stays in the answer', () {
+      expect(
+        segment(
+          'Q: What are the causes of inflation?\n'
+          'A: Demand-pull inflation.\n'
+          'Is cost-push inflation a cause?\n'
+          'Yes.',
+        ),
+        const [
+          CardSegment(
+            question: 'What are the causes of inflation?',
+            answer:
+                'Demand-pull inflation.\n'
+                'Is cost-push inflation a cause?\n'
+                'Yes.',
+          ),
+        ],
+      );
+    });
+
+    test('a question mark inside an unlabelled answer stays in the answer', () {
+      expect(
+        segment(
+          'What is the Socratic method?\n'
+          'A method of inquiry. Does it work?',
+        ),
+        const [
+          CardSegment(
+            question: 'What is the Socratic method?',
+            answer: 'A method of inquiry. Does it work?',
+          ),
+        ],
+      );
+      expect(
+        segment('What is a permalink?\nSee https://example.com?'),
+        const [
+          CardSegment(
+            question: 'What is a permalink?',
+            answer: 'See https://example.com?',
+          ),
+        ],
+      );
+    });
   });
 
   group('blocks, noise and normalisation', () {
@@ -151,10 +217,33 @@ void main() {
       );
     });
 
-    test('page furniture yields no cards', () {
+    test('noise without a prompt yields no cards', () {
+      expect(segment('12\nPage 3 of 20\n3 / 20\n•••\nChapter 4: Memory'), isEmpty);
+    });
+
+    test('page furniture never becomes an answer', () {
+      const footers = [
+        '12',
+        '12.',
+        '12)',
+        'Page 3 of 20',
+        'Slide 4',
+        'Slide 4 of 20',
+        '3 / 20',
+        'p. 3',
+        '- 12 -',
+      ];
+      for (final footer in footers) {
+        expect(segment('What is osmosis?\n$footer'), isEmpty, reason: footer);
+      }
       expect(
-        segment('12\nPage 3 of 20\n3 / 20\n•••\nChapter 4: Memory'),
-        isEmpty,
+        segment('What is osmosis?\nThe movement of water.\nSlide 4'),
+        const [
+          CardSegment(
+            question: 'What is osmosis?',
+            answer: 'The movement of water.',
+          ),
+        ],
       );
     });
 
