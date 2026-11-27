@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required by image_picker for taking a photo -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="mindstack"
         android:name="${applicationName}"
@@ -40,6 +42,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Opening this app's settings page through url_launcher -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="package"/>
         </intent>
     </queries>
 </manifest>
