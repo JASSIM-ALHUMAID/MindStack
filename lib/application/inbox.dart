@@ -39,6 +39,10 @@ final class InboxCommands {
   /// Throws [StorageFailure] if the write fails.
   Future<void> clear() => _ref.read(draftRepositoryProvider).clear();
 
+  /// Adds [drafts] to the Inbox in one atomic batch
+  Future<void> addDrafts(List<DraftCard> drafts) =>
+      _ref.read(draftRepositoryProvider).insertAll(drafts);
+
   Future<void> deleteDraft(String id) =>
       _ref.read(draftRepositoryProvider).delete([id]);
 

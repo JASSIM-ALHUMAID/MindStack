@@ -6,7 +6,9 @@ import 'dart:typed_data';
 import 'package:mindstack/core/clock.dart';
 import 'package:mindstack/core/ids.dart';
 import 'package:mindstack/core/logger.dart';
+import 'package:mindstack/domain/app_settings.dart';
 import 'package:mindstack/domain/deck_file_picker.dart';
+import 'package:mindstack/domain/image_picker.dart';
 import 'package:mindstack/domain/text_recognizer.dart';
 
 /// A [Clock] frozen at a chosen instant that tests can move forward.
@@ -133,4 +135,60 @@ final class FakeTextRecognizer implements TextRecognizer {
 
   @override
   Future<void> close() async => closes++;
+}
+
+final class FakePickedImage implements PickedImage {
+  const FakePickedImage(this.path);
+
+  @override
+  final String path;
+}
+
+/// Returns queued pick results in order; an empty queue cancels
+final class FakeImagePicker implements ImagePicker {
+  FakeImagePicker([List<Object> results = const []]) : _results = [...results];
+
+  final List<Object> _results;
+
+  int galleryCalls = 0;
+  int cameraCalls = 0;
+
+  Completer<void>? gate;
+
+  void queue(ImagePickResult result) => _results.add(result);
+
+  void queueError(Object error) => _results.add(error);
+
+  @override
+  Future<ImagePickResult> pickGallery() async {
+    galleryCalls++;
+    return _next();
+  }
+
+  @override
+  Future<ImagePickResult> pickCamera() async {
+    cameraCalls++;
+    return _next();
+  }
+
+  Future<ImagePickResult> _next() async {
+    await gate?.future;
+    if (_results.isEmpty) return ImagesPicked(const []);
+    final next = _results.removeAt(0);
+    if (next is ImagePickResult) return next;
+    Error.throwWithStackTrace(next, StackTrace.current);
+  }
+}
+
+final class FakeAppSettings implements AppSettings {
+  FakeAppSettings({this.result = true});
+
+  bool result;
+  int opens = 0;
+
+  @override
+  Future<bool> open() async {
+    opens++;
+    return result;
+  }
 }

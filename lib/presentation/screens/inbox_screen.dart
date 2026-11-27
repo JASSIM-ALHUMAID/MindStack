@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../application/deck_import.dart';
+import '../../application/image_import.dart';
 import '../../application/inbox.dart';
 import '../../application/library.dart';
 import '../../application/services.dart';
@@ -107,6 +108,50 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     );
   }
 
+  void _reportImport(
+    ScaffoldMessengerState messenger,
+    ImageImportResult result,
+  ) {
+    if (result is! ImageImportSucceeded) return;
+    final count = result.count;
+    final skipped = result.skipped;
+    final suffix = skipped == 0
+        ? ''
+        : ' · $skipped ${skipped == 1 ? 'image' : 'images'} had no cards';
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '$count ${count == 1 ? 'draft' : 'drafts'} imported$suffix',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _importImages(ImageImportKind kind) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await ref.read(imageImportProvider.notifier).import(kind);
+    if (mounted) _reportImport(messenger, result);
+  }
+
+  Future<void> _retryImages() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await ref.read(imageImportProvider.notifier).retry();
+    if (mounted) _reportImport(messenger, result);
+  }
+
+  Future<void> _openSettings() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await ref.read(imageImportProvider.notifier).openSettings();
+    if (opened || !mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Couldn't open settings. Open Settings → Apps → MindStack to change access.",
+        ),
+      ),
+    );
+  }
+
   Future<void> _clear() async {
     setState(() => _busy = true);
     final commands = ref.read(inboxCommandsProvider);
@@ -175,6 +220,8 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     final selectedCount = drafts.where((d) => d.selected).length;
     final ocrProgress = ref.watch(ocrProgressProvider);
     final importState = ref.watch(deckImportProvider);
+    final imageState = ref.watch(imageImportProvider);
+    final imagesBusy = imageState is ImageImportScanning;
     final reading = importState is ImportReading;
     // Watched so the decks are loaded by the time the deck chooser opens; the
     // save button stays disabled until they are.
@@ -203,28 +250,34 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
                 style: TextStyle(color: AppColors.muted),
               ),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _notImplemented(context),
-                      icon: const Icon(LucideIcons.camera),
-                      label: const Text('Screenshots'),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: imagesBusy || reading || _busy
+                        ? null
+                        : () => _importImages(ImageImportKind.gallery),
+                    icon: const Icon(LucideIcons.images),
+                    label: const Text('Screenshots'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _notImplemented(context),
-                      icon: const Icon(LucideIcons.fileText),
-                      label: const Text('PDF'),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: imagesBusy || reading || _busy
+                        ? null
+                        : () => _importImages(ImageImportKind.camera),
+                    icon: const Icon(LucideIcons.camera),
+                    label: const Text('Take a picture'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _notImplemented(context),
+                    icon: const Icon(LucideIcons.fileText),
+                    label: const Text('PDF'),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               TextButton.icon(
-                onPressed: reading
+                onPressed: reading || imagesBusy
                     ? null
                     : () => _import((n) => n.pickAndImport()),
                 icon: const Icon(LucideIcons.fileUp, size: 18),
@@ -246,6 +299,18 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
                   message: message,
                   onRetry: () => _import((n) => n.retry()),
                   onChooseAnother: () => _import((n) => n.pickAndImport()),
+                ),
+              ],
+              if (imageState case ImageImportFailed(
+                :final message,
+                :final canRetry,
+                :final canOpenSettings,
+              )) ...[
+                const SizedBox(height: 12),
+                _ImageImportError(
+                  message: message,
+                  onRetry: canRetry ? _retryImages : null,
+                  onOpenSettings: canOpenSettings ? _openSettings : null,
                 ),
               ],
             ],
@@ -367,6 +432,60 @@ class _DraftTileState extends ConsumerState<_DraftTile> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ImageImportError extends StatelessWidget {
+  const _ImageImportError({
+    required this.message,
+    required this.onRetry,
+    required this.onOpenSettings,
+  });
+
+  final String message;
+  final VoidCallback? onRetry;
+  final VoidCallback? onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "COULDN'T READ THIS IMAGE",
+          style: kMonoLabel.copyWith(color: AppColors.danger),
+        ),
+        const SizedBox(height: 8),
+        SoftCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message, style: const TextStyle(color: AppColors.muted)),
+              if (onRetry != null) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onRetry,
+                    child: const Text('Try again'),
+                  ),
+                ),
+              ],
+              if (onOpenSettings != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: onOpenSettings,
+                    child: const Text('Open settings'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

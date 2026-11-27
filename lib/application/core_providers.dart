@@ -6,14 +6,18 @@ import 'package:path_provider/path_provider.dart';
 
 import '../data/database/app_database.dart';
 import '../data/drift_transaction_runner.dart';
+import '../data/platform_app_settings.dart';
 import '../data/platform_deck_file_picker.dart';
+import '../data/platform_image_picker.dart';
 import '../data/repositories/drift_card_repository.dart';
 import '../data/repositories/drift_draft_repository.dart';
 import '../data/repositories/drift_library_repository.dart';
 import '../data/repositories/drift_review_log_repository.dart';
 import '../data/sample_data.dart';
 import '../data/seed.dart';
+import '../domain/app_settings.dart';
 import '../domain/deck_file_picker.dart';
+import '../domain/image_picker.dart';
 import '../domain/repositories.dart';
 import 'services.dart';
 
@@ -69,4 +73,12 @@ final transactionRunnerProvider = Provider<TransactionRunner>(
 
 final deckFilePickerProvider = Provider<DeckFilePicker>(
   (ref) => const PlatformDeckFilePicker(),
+);
+
+final imagePickerProvider = Provider<ImagePicker>(
+  (ref) => const PlatformImagePicker(),
+);
+
+final appSettingsProvider = Provider<AppSettings>(
+  (ref) => const PlatformAppSettings(),
 );
