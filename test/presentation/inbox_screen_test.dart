@@ -1,14 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mindstack/application/core_providers.dart';
 import 'package:mindstack/application/inbox.dart';
+import 'package:mindstack/application/ocr.dart';
 import 'package:mindstack/application/startup.dart';
 import 'package:mindstack/data/drift_transaction_runner.dart';
 import 'package:mindstack/domain/enums.dart';
+import 'package:mindstack/domain/image_picker.dart';
 import 'package:mindstack/domain/models/draft_card.dart';
 import 'package:mindstack/domain/repositories.dart';
+import 'package:mindstack/domain/text_recognizer.dart';
 import 'package:mindstack/presentation/screens/inbox_screen.dart';
 
 import '../support/container.dart';
@@ -30,6 +34,13 @@ final class _GatedRunner implements TransactionRunner {
     return _inner.run(action);
   }
 }
+
+typedef Harness = ({
+  FakeImagePicker picker,
+  FakeTextRecognizer recognizer,
+  FakeAppSettings settings,
+  ProviderContainer container,
+});
 
 void main() {
   testWidgets('Save selected ignores a second tap while saving', (
@@ -297,5 +308,169 @@ void main() {
     expect(find.text('Old question'), findsNothing);
     final draft = (await container.read(draftsProvider.future)).single;
     expect(draft.question, 'New question');
+  });
+
+  group('image import', () {
+    const cardText = 'Q: What is osmosis?\nA: Water movement';
+    const pickPath = '/tmp/screenshot.png';
+
+    Future<Harness> pumpImages(
+      WidgetTester tester, {
+      required List<Object> pickResults,
+      List<Object> ocrResults = const [
+        RecognizedText([RecognizedBlock(cardText)]),
+      ],
+      bool settingsResult = true,
+    }) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final picker = FakeImagePicker(pickResults);
+      final recognizer = FakeTextRecognizer(ocrResults);
+      final settings = FakeAppSettings(result: settingsResult);
+      final container = makeContainer(
+        overrides: [
+          imagePickerProvider.overrideWithValue(picker),
+          textRecognizerFactoryProvider.overrideWithValue(() => recognizer),
+          appSettingsProvider.overrideWithValue(settings),
+        ],
+      );
+      await pumpInApp(tester, container, const InboxScreen());
+      await tester.pumpAndSettle();
+      return (
+        picker: picker,
+        recognizer: recognizer,
+        settings: settings,
+        container: container,
+      );
+    }
+
+    testWidgets('Screenshots picks a gallery image and shows its drafts', (
+      tester,
+    ) async {
+      final h = await pumpImages(
+        tester,
+        pickResults: [
+          ImagesPicked([const FakePickedImage(pickPath)]),
+        ],
+      );
+
+      await tester.tap(find.text('Screenshots'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What is osmosis?'), findsOneWidget);
+      expect(find.text('1 draft imported'), findsOneWidget);
+      expect(find.text('SLIDE'), findsOneWidget);
+      expect(h.recognizer.paths, [pickPath]);
+    });
+
+    testWidgets('Take a picture uses the camera and tags drafts as photos', (
+      tester,
+    ) async {
+      final h = await pumpImages(
+        tester,
+        pickResults: [
+          ImagesPicked([const FakePickedImage(pickPath)]),
+        ],
+      );
+
+      await tester.tap(find.text('Take a picture'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Water movement'), findsOneWidget);
+      expect(find.text('PHOTO'), findsOneWidget);
+      expect(h.picker.cameraCalls, 1);
+      expect(h.picker.galleryCalls, 0);
+    });
+
+    testWidgets('cancelling the picker leaves the Inbox empty', (tester) async {
+      await pumpImages(tester, pickResults: [ImagesPicked(const [])]);
+
+      await tester.tap(find.text('Screenshots'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No drafts yet. Import something above.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('denied'), findsNothing);
+    });
+
+    testWidgets('a denial shows the message and Try again', (tester) async {
+      await pumpImages(
+        tester,
+        pickResults: [const ImagePickFailure(ImagePickFailureKind.denied)],
+      );
+
+      await tester.tap(find.text('Take a picture'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Photo access was denied. Allow photos to import images.'),
+        findsOneWidget,
+      );
+      expect(find.text('Try again'), findsOneWidget);
+    });
+
+    testWidgets('a second denial offers Open settings', (tester) async {
+      final h = await pumpImages(
+        tester,
+        pickResults: [
+          const ImagePickFailure(ImagePickFailureKind.denied),
+          const ImagePickFailure(ImagePickFailureKind.denied),
+        ],
+      );
+
+      await tester.tap(find.text('Take a picture'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Take a picture'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open settings'), findsOneWidget);
+      await tester.tap(find.text('Open settings'));
+      await tester.pumpAndSettle();
+      expect(h.settings.opens, 1);
+    });
+
+    testWidgets('no text shows the recogniser message', (tester) async {
+      await pumpImages(
+        tester,
+        pickResults: [
+          ImagesPicked([const FakePickedImage(pickPath)]),
+        ],
+        ocrResults: const [RecognitionFailure(RecognitionFailureKind.noText)],
+      );
+
+      await tester.tap(find.text('Screenshots'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No text was found in this image.'), findsOneWidget);
+      expect(find.text('What is osmosis?'), findsNothing);
+    });
+
+    testWidgets('image buttons are disabled while a scan runs', (tester) async {
+      final gate = Completer<void>();
+      final h = await pumpImages(
+        tester,
+        pickResults: [
+          ImagesPicked([const FakePickedImage(pickPath)]),
+        ],
+      );
+      h.recognizer.gate = gate;
+
+      await tester.tap(find.text('Screenshots'));
+      await tester.pump();
+
+      final button = tester.widget<OutlinedButton>(
+        find.ancestor(
+          of: find.text('Screenshots'),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(button.onPressed, isNull);
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('What is osmosis?'), findsOneWidget);
+    });
   });
 }
