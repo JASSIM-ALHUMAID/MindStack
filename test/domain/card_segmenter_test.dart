@@ -66,6 +66,22 @@ void main() {
       );
     });
 
+    test('an Ans label is accepted in any case', () {
+      expect(segment('Q: What is X?\nAns: Y\nQ: What is Z?\nans: W'), const [
+        CardSegment(question: 'What is X?', answer: 'Y'),
+        CardSegment(question: 'What is Z?', answer: 'W'),
+      ]);
+    });
+
+    test('an Ans label resolves an MCQ letter', () {
+      expect(segment('Which is a language?\nA. HTML\nB. Python\nAns: B'), const [
+        CardSegment(
+          question: 'Which is a language?\nA. HTML\nB. Python',
+          answer: 'B. Python',
+        ),
+      ]);
+    });
+
     test('multiple-choice options are not an answer', () {
       expect(
         segment('Q. Which is correct?\nA. First option\nB. Second option'),
@@ -352,6 +368,66 @@ void main() {
       expect(
         segment('Q: X?\nA: Y\nQ: X?\nA: Y'),
         const [CardSegment(question: 'X?', answer: 'Y')],
+      );
+    });
+  });
+
+  group('line and page checks', () {
+    const segmenter = CardSegmenter();
+
+    test('card lines are labels, choices and questions', () {
+      for (final line in [
+        'Q: What is X?',
+        'Answer: B',
+        'Ans: Y',
+        'b) Python',
+        '• What are the three types of memory?',
+      ]) {
+        expect(segmenter.isCardLine(line), isTrue, reason: line);
+      }
+      for (final line in ['SWE 463 · Lecture 4', 'Chapter 4: Memory', '12']) {
+        expect(segmenter.isCardLine(line), isFalse, reason: line);
+      }
+    });
+
+    test('answer lines need an answer label', () {
+      expect(segmenter.isAnswerLine('A: The mitochondria'), isTrue);
+      expect(segmenter.isAnswerLine('Ans: B'), isTrue);
+      expect(segmenter.isAnswerLine('A. HTML'), isFalse);
+      expect(segmenter.isAnswerLine('Answers vary'), isFalse);
+    });
+
+    List<RecognizedBlock> blocks(String text) => [RecognizedBlock(text)];
+
+    test('an unanswered question is open', () {
+      expect(
+        segmenter.endsWithOpenQuestion(blocks('Recap\nQ: What is X?\n12')),
+        isTrue,
+      );
+      expect(
+        segmenter.endsWithOpenQuestion(blocks('What are the three types?')),
+        isTrue,
+      );
+      expect(
+        segmenter.endsWithOpenQuestion(
+          blocks('Which is a language?\nA. HTML\nB. Python'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('an answered question or plain text is not open', () {
+      expect(
+        segmenter.endsWithOpenQuestion(blocks('Q: What is X?\nA: Y')),
+        isFalse,
+      );
+      expect(
+        segmenter.endsWithOpenQuestion(blocks('What is X?\n• Y\n• Z')),
+        isFalse,
+      );
+      expect(
+        segmenter.endsWithOpenQuestion(blocks('Chapter 4: Memory')),
+        isFalse,
       );
     });
   });

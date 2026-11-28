@@ -25,9 +25,9 @@ class CardSegment {
 /// Turns recognised text into question/answer cards.
 ///
 /// A card needs a clear prompt:
-/// 1. `Q:`/`Question:` followed by `A:`/`Answer:`.
+/// 1. `Q:`/`Question:` followed by `A:`/`Ans:`/`Answer:`.
 /// 2. A question line ending in `?` followed by body lines.
-/// 3. Up to four choices A-D followed by an `Answer:`/`answer:` line.
+/// 3. Up to four choices A-D followed by an `Answer:`/`Ans:` line.
 ///
 /// Headings, bullets without a question and plain paragraphs are ignored:
 /// they do not give a card a prompt, so the draft would be noise. MCQ
@@ -41,7 +41,7 @@ final class CardSegmenter {
     caseSensitive: false,
   );
   static final _answerLabel = RegExp(
-    r'^(?:A|Answer)\s*\d*\s*:\s*',
+    r'^(?:A|Ans|Answer)\s*\d*\s*:\s*',
     caseSensitive: false,
   );
   static final _bullet = RegExp(r'^(?:[-*•·–—]\s+|\d+[.)]\s+)');
@@ -71,7 +71,29 @@ final class CardSegmenter {
   ///
   /// Blocks are read in the order given. A question or answer may continue
   /// across a block boundary.
-  List<CardSegment> segment(List<RecognizedBlock> blocks) {
+  List<CardSegment> segment(List<RecognizedBlock> blocks) =>
+      _run(blocks).segments;
+
+  /// Whether [blocks] end with a question that has no answer yet
+  bool endsWithOpenQuestion(List<RecognizedBlock> blocks) => _run(blocks).open;
+
+  /// Whether [line] is a Q/A label, an MCQ choice or a question
+  bool isCardLine(String line) {
+    final cleaned = _clean(line);
+    if (cleaned == null) return false;
+    return _questionLabel.hasMatch(cleaned) ||
+        _answerLabel.hasMatch(cleaned) ||
+        _option.hasMatch(cleaned) ||
+        cleaned.endsWith('?');
+  }
+
+  /// Whether [line] starts with an answer label
+  bool isAnswerLine(String line) {
+    final cleaned = _clean(line);
+    return cleaned != null && _answerLabel.hasMatch(cleaned);
+  }
+
+  ({List<CardSegment> segments, bool open}) _run(List<RecognizedBlock> blocks) {
     final cleaned = <({String text, int block})>[];
     for (var block = 0; block < blocks.length; block++) {
       final text = blocks[block].text
@@ -186,8 +208,10 @@ final class CardSegmenter {
       if (collectingAnswer) answer.add(line.text);
     }
 
+    final last = question;
+    final open = last != null && last.trim().isNotEmpty && answer.isEmpty;
     flush();
-    return segments;
+    return (segments: segments, open: open);
   }
 
   /// An option counts only when another option is adjacent
