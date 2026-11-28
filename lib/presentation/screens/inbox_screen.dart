@@ -8,6 +8,7 @@ import '../../application/deck_import.dart';
 import '../../application/image_import.dart';
 import '../../application/inbox.dart';
 import '../../application/library.dart';
+import '../../application/pdf_import.dart';
 import '../../application/services.dart';
 import '../../domain/mindstack_file.dart';
 import '../../domain/models/deck.dart';
@@ -86,10 +87,77 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     );
   }
 
-  void _notImplemented(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('On-device import arrives in Phase 4')),
+  Future<void> _importPdf(
+    Future<PdfImportResult> Function(PdfImportNotifier) run,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(pdfImportProvider.notifier);
+    final result = await run(notifier);
+    if (!mounted) return;
+    switch (result) {
+      case PdfImportSucceeded(:final count, :final failedPages):
+        _reportPdf(messenger, count, failedPages);
+      case final PdfImportStopped stopped:
+        await _keepOrDiscard(messenger, notifier, stopped);
+      case PdfImportCancelled() || PdfImportRefused():
+        break;
+    }
+  }
+
+  void _reportPdf(
+    ScaffoldMessengerState messenger,
+    int count,
+    int failedPages,
+  ) {
+    final suffix = failedPages == 0
+        ? ''
+        : " · $failedPages ${failedPages == 1 ? 'page' : 'pages'} couldn't be read";
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '$count ${count == 1 ? 'draft' : 'drafts'} imported$suffix',
+        ),
+      ),
     );
+  }
+
+  Future<void> _keepOrDiscard(
+    ScaffoldMessengerState messenger,
+    PdfImportNotifier notifier,
+    PdfImportStopped stopped,
+  ) async {
+    final n = stopped.count;
+    final keep = await showDialog<bool>(
+      context: context,
+      // A stray tap outside must not throw the drafts away
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Keep the drafts found so far?'),
+        content: Text(
+          '$n ${n == 1 ? 'draft was' : 'drafts were'} found in the first '
+          '${stopped.pagesRead} of ${stopped.pageCount} pages.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Discard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Keep'),
+          ),
+        ],
+      ),
+    );
+    if (keep != true || !mounted) {
+      notifier.discardPartial();
+      return;
+    }
+    var kept = 0;
+    final saved = await runSave(context, ref, () async {
+      kept = await notifier.keepPartial();
+    });
+    if (saved) _reportPdf(messenger, kept, 0);
   }
 
   Future<void> _import(
@@ -221,7 +289,9 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
     final ocrProgress = ref.watch(ocrProgressProvider);
     final importState = ref.watch(deckImportProvider);
     final imageState = ref.watch(imageImportProvider);
-    final imagesBusy = imageState is ImageImportScanning;
+    final pdfState = ref.watch(pdfImportProvider);
+    final pdfBusy = pdfState is PdfImportReading;
+    final scanning = imageState is ImageImportScanning || pdfBusy;
     final reading = importState is ImportReading;
     // Watched so the decks are loaded by the time the deck chooser opens; the
     // save button stays disabled until they are.
@@ -250,34 +320,47 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
                 style: TextStyle(color: AppColors.muted),
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: imagesBusy || reading || _busy
-                        ? null
-                        : () => _importImages(ImageImportKind.gallery),
-                    icon: const Icon(LucideIcons.images),
-                    label: const Text('Screenshots'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: imagesBusy || reading || _busy
-                        ? null
-                        : () => _importImages(ImageImportKind.camera),
-                    icon: const Icon(LucideIcons.camera),
-                    label: const Text('Take a picture'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _notImplemented(context),
-                    icon: const Icon(LucideIcons.fileText),
-                    label: const Text('PDF'),
-                  ),
-                ],
+              // Equal heights when large text wraps one label
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: scanning || reading || _busy
+                            ? null
+                            : () => _importImages(ImageImportKind.gallery),
+                        icon: const Icon(LucideIcons.images),
+                        label: const Text('Screenshots'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: scanning || reading || _busy
+                            ? null
+                            : () => _importImages(ImageImportKind.camera),
+                        icon: const Icon(LucideIcons.camera),
+                        label: const Text('Take a picture'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: scanning || reading || _busy
+                      ? null
+                      : () => _importPdf((n) => n.pickAndImport()),
+                  icon: const Icon(LucideIcons.fileText),
+                  label: const Text('PDF'),
+                ),
               ),
               const SizedBox(height: 4),
               TextButton.icon(
-                onPressed: reading || imagesBusy
+                onPressed: reading || scanning
                     ? null
                     : () => _import((n) => n.pickAndImport()),
                 icon: const Icon(LucideIcons.fileUp, size: 18),
@@ -286,6 +369,49 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
               if (ocrProgress != null) ...[
                 const SizedBox(height: 12),
                 LinearProgressIndicator(value: ocrProgress),
+              ],
+              if (pdfState case PdfImportReading(
+                :final page,
+                :final pageCount,
+                :final cancelling,
+              )) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cancelling
+                            ? 'STOPPING AFTER THIS PAGE…'
+                            : page == 0
+                            ? 'OPENING PDF…'
+                            : 'READING PAGE $page OF $pageCount',
+                        style: kMonoLabel,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: cancelling
+                          ? null
+                          : ref.read(pdfImportProvider.notifier).cancel,
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: page == 0 ? null : page / pageCount,
+                ),
+              ],
+              if (pdfState case PdfImportFailed(
+                :final message,
+                :final canRetry,
+              )) ...[
+                const SizedBox(height: 12),
+                _ImportError(
+                  title: "This PDF couldn't be imported",
+                  message: message,
+                  onRetry: canRetry ? () => _importPdf((n) => n.retry()) : null,
+                  onChooseAnother: () => _importPdf((n) => n.pickAndImport()),
+                ),
               ],
               if (reading) ...[
                 const SizedBox(height: 12),
@@ -330,7 +456,7 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
             padding: const EdgeInsets.all(32),
             child: Center(
               child: Text(
-                importState is ImportFailed
+                importState is ImportFailed || pdfState is PdfImportFailed
                     ? 'No drafts yet. Fix the import above.'
                     : 'No drafts yet. Import something above.',
               ),
@@ -353,7 +479,8 @@ class _InboxContentState extends ConsumerState<_InboxContent> {
           ],
         if (drafts.isNotEmpty)
           FilledButton(
-            onPressed: selectedCount == 0 || _busy || !decksReady || reading
+            onPressed:
+                selectedCount == 0 || _busy || !decksReady || reading || pdfBusy
                 ? null
                 : _chooseDeck,
             child: Text('Save selected ($selectedCount) to a deck'),
@@ -492,11 +619,15 @@ class _ImageImportError extends StatelessWidget {
 
 /// Figma frame "Inbox (Error State)".
 class _ImportError extends StatelessWidget {
+  final String title;
   final String message;
-  final VoidCallback onRetry;
+
+  /// Null hides Retry when the same file would fail again
+  final VoidCallback? onRetry;
   final VoidCallback onChooseAnother;
 
   const _ImportError({
+    this.title = "This file couldn't be read",
     required this.message,
     required this.onRetry,
     required this.onChooseAnother,
@@ -518,18 +649,20 @@ class _ImportError extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("This file couldn't be read", style: kSerifSection),
+              Text(title, style: kSerifSection),
               const SizedBox(height: 6),
               Text(message, style: const TextStyle(color: AppColors.muted)),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onRetry,
-                  child: const Text('Retry import'),
+              if (onRetry != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onRetry,
+                    child: const Text('Retry import'),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
