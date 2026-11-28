@@ -11,6 +11,8 @@ import 'package:mindstack/data/drift_transaction_runner.dart';
 import 'package:mindstack/domain/enums.dart';
 import 'package:mindstack/domain/image_picker.dart';
 import 'package:mindstack/domain/models/draft_card.dart';
+import 'package:mindstack/domain/pdf_document.dart';
+import 'package:mindstack/domain/pdf_file_picker.dart';
 import 'package:mindstack/domain/repositories.dart';
 import 'package:mindstack/domain/text_recognizer.dart';
 import 'package:mindstack/presentation/screens/inbox_screen.dart';
@@ -471,6 +473,155 @@ void main() {
       gate.complete();
       await tester.pumpAndSettle();
       expect(find.text('What is osmosis?'), findsOneWidget);
+    });
+  });
+
+  group('PDF import', () {
+    Future<({FakePdfFilePicker picker, FakePdfReader reader})> pumpPdf(
+      WidgetTester tester, {
+      List<PickedPdf?>? files,
+      required List<Object> opens,
+    }) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final picker = FakePdfFilePicker(files ?? [FakePickedPdf()]);
+      final reader = FakePdfReader(opens);
+      final container = makeContainer(
+        overrides: [
+          pdfFilePickerProvider.overrideWithValue(picker),
+          pdfReaderProvider.overrideWithValue(reader),
+          textRecognizerFactoryProvider.overrideWithValue(
+            FakeTextRecognizer.new,
+          ),
+        ],
+      );
+      await pumpInApp(tester, container, const InboxScreen());
+      await tester.pumpAndSettle();
+      return (picker: picker, reader: reader);
+    }
+
+    OutlinedButton button(WidgetTester tester, String label) =>
+        tester.widget<OutlinedButton>(
+          find.ancestor(
+            of: find.text(label),
+            matching: find.byType(OutlinedButton),
+          ),
+        );
+
+    testWidgets('PDF imports the cards and reports them', (tester) async {
+      await pumpPdf(
+        tester,
+        opens: [
+          FakeOpenPdf([
+            'Title slide for the lecture',
+            'Q: What is the powerhouse of the cell?\nA: The mitochondria',
+          ]),
+        ],
+      );
+
+      await tester.tap(find.text('PDF'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What is the powerhouse of the cell?'), findsOneWidget);
+      expect(find.text('PAGE 2'), findsOneWidget);
+      expect(find.text('PDF'), findsWidgets);
+      expect(find.text('1 draft imported'), findsOneWidget);
+    });
+
+    testWidgets('shows the page being read and blocks other imports', (
+      tester,
+    ) async {
+      final pdf = FakeOpenPdf.cards(2)..gate = Completer<void>();
+      await pumpPdf(tester, opens: [pdf]);
+
+      await tester.tap(find.text('PDF'));
+      await tester.pump();
+
+      expect(find.text('READING PAGE 1 OF 2'), findsOneWidget);
+      expect(button(tester, 'PDF').onPressed, isNull);
+      expect(button(tester, 'Screenshots').onPressed, isNull);
+      pdf.gate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('READING PAGE 1 OF 2'), findsNothing);
+      expect(find.text('2 drafts imported'), findsOneWidget);
+    });
+
+    Future<void> cancelAfterFirstPage(WidgetTester tester) async {
+      final pdf = FakeOpenPdf.cards(3)..gate = Completer<void>();
+      await pumpPdf(tester, opens: [pdf]);
+      await tester.tap(find.text('PDF'));
+      await tester.pump();
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      expect(find.text('STOPPING AFTER THIS PAGE…'), findsOneWidget);
+      pdf.gate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Keep the drafts found so far?'), findsOneWidget);
+      expect(
+        find.text('1 draft was found in the first 1 of 3 pages.'),
+        findsOneWidget,
+      );
+    }
+
+    testWidgets('Cancel then Keep adds the drafts read so far', (tester) async {
+      await cancelAfterFirstPage(tester);
+
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What is 1?'), findsOneWidget);
+      expect(find.text('What is 2?'), findsNothing);
+      expect(find.text('1 draft imported'), findsOneWidget);
+    });
+
+    testWidgets('Cancel then Discard adds nothing', (tester) async {
+      await cancelAfterFirstPage(tester);
+
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What is 1?'), findsNothing);
+      expect(
+        find.text('No drafts yet. Import something above.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a refused PDF offers another file but no retry', (
+      tester,
+    ) async {
+      final h = await pumpPdf(
+        tester,
+        files: [
+          FakePickedPdf(),
+          FakePickedPdf(path: '/tmp/other.pdf'),
+        ],
+        opens: [
+          const PdfOpenFailure(PdfOpenFailureKind.passwordProtected),
+          FakeOpenPdf.cards(1),
+        ],
+      );
+
+      await tester.tap(find.text('PDF'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("This PDF couldn't be imported"), findsOneWidget);
+      expect(
+        find.text(
+          'This PDF is password-protected. Remove the password and try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Retry import'), findsNothing);
+      expect(find.text('No drafts yet. Fix the import above.'), findsOneWidget);
+
+      await tester.tap(find.text('Choose another file'));
+      await tester.pumpAndSettle();
+
+      expect(h.reader.paths, ['/tmp/lecture.pdf', '/tmp/other.pdf']);
+      expect(find.text('What is 1?'), findsOneWidget);
+      expect(find.text("This PDF couldn't be imported"), findsNothing);
     });
   });
 }

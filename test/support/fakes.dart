@@ -9,6 +9,8 @@ import 'package:mindstack/core/logger.dart';
 import 'package:mindstack/domain/app_settings.dart';
 import 'package:mindstack/domain/deck_file_picker.dart';
 import 'package:mindstack/domain/image_picker.dart';
+import 'package:mindstack/domain/pdf_document.dart';
+import 'package:mindstack/domain/pdf_file_picker.dart';
 import 'package:mindstack/domain/text_recognizer.dart';
 
 /// A [Clock] frozen at a chosen instant that tests can move forward.
@@ -190,5 +192,112 @@ final class FakeAppSettings implements AppSettings {
   Future<bool> open() async {
     opens++;
     return result;
+  }
+}
+
+final class FakePickedPdf implements PickedPdf {
+  FakePickedPdf({this.path = '/tmp/lecture.pdf', this.size = 1024});
+
+  final String path;
+  final int? size;
+
+  @override
+  Future<int?> length() async => size;
+
+  @override
+  Future<String> localPath() async => path;
+}
+
+/// Returns the queued files in order; an empty queue cancels
+final class FakePdfFilePicker implements PdfFilePicker {
+  FakePdfFilePicker([List<PickedPdf?> files = const []]) : _files = [...files];
+
+  final List<PickedPdf?> _files;
+  int picks = 0;
+
+  @override
+  Future<PickedPdf?> pick() async {
+    picks++;
+    return _files.isEmpty ? null : _files.removeAt(0);
+  }
+}
+
+final class FakeRenderedPage implements RenderedPage {
+  FakeRenderedPage(this.path, this._deleted);
+
+  @override
+  final String path;
+
+  final List<String> _deleted;
+
+  @override
+  Future<void> delete() async => _deleted.add(path);
+}
+
+/// A PDF whose pages are given as text. An empty string is a scanned page;
+/// an [Exception] makes reading that page's text throw.
+final class FakeOpenPdf implements OpenPdf {
+  FakeOpenPdf(this.pages, {this.renderFailures = const {}});
+
+  /// [count] pages, each with its own labelled card
+  FakeOpenPdf.cards(int count)
+    : this([for (var i = 1; i <= count; i++) 'Q: What is $i?\nA: Answer $i']);
+
+  final List<Object> pages;
+  final Set<int> renderFailures;
+
+  final List<int> textReads = [];
+  final List<({int page, int maxEdge})> renders = [];
+  final List<String> deleted = [];
+  int closes = 0;
+
+  /// Holds page text until completed; a test may cancel meanwhile
+  Completer<void>? gate;
+
+  /// Only this page waits for [gate]; null means every page
+  int? gatedPage;
+
+  @override
+  int get pageCount => pages.length;
+
+  @override
+  Future<String> pageText(int pageNumber) async {
+    textReads.add(pageNumber);
+    if (gatedPage == null || gatedPage == pageNumber) await gate?.future;
+    final page = pages[pageNumber - 1];
+    if (page is String) return page;
+    Error.throwWithStackTrace(page, StackTrace.current);
+  }
+
+  @override
+  Future<RenderedPage> renderPage(
+    int pageNumber, {
+    required int maxEdge,
+  }) async {
+    renders.add((page: pageNumber, maxEdge: maxEdge));
+    if (renderFailures.contains(pageNumber)) {
+      throw StateError('render failed');
+    }
+    return FakeRenderedPage('/tmp/page-$pageNumber.png', deleted);
+  }
+
+  @override
+  Future<void> close() async => closes++;
+}
+
+/// Returns queued open results in order and records the opened paths
+final class FakePdfReader implements PdfReader {
+  FakePdfReader([List<Object> results = const []]) : _results = [...results];
+
+  final List<Object> _results;
+  final List<String> paths = [];
+
+  @override
+  Future<PdfOpenResult> open(String path) async {
+    paths.add(path);
+    final next = _results.removeAt(0);
+    if (next is PdfOpenResult) return next;
+    if (next is OpenPdf) return PdfOpened(next);
+    Error.throwWithStackTrace(next, StackTrace.current);
   }
 }
